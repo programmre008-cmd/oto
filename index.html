@@ -1,0 +1,3309 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#19143c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="oto">
+<link id="pwaManifestLink" rel="manifest" href="">
+<link id="pwaAppleIconLink" rel="apple-touch-icon" href="">
+<title>oto – เช็คอิน บันทึกโอที ลาพักร้อน</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #19143c;
+    --navy-mid: #2d2666;
+    --indigo: #4b29f2;
+    --peach: #ffb98a;
+    --peach-soft: #ffe8d6;
+    --muted: #7a76a3;
+    --ok: #36c78c;
+    --bad: #ff5c72;
+    --bg: #e9e5ff;
+  }
+  * { box-sizing: border-box; font-family: 'Prompt', system-ui, sans-serif; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); }
+  
+  /* สไตล์ลายเส้นการ์ตูนขอบหนาแบบ Doodle Comic */
+  .comic-card {
+    background: #ffffff;
+    color: var(--navy);
+    border: 2.5px solid var(--navy);
+    box-shadow: 0 4px 0 var(--navy-mid);
+    border-radius: 22px;
+  }
+  .comic-btn {
+    border: 2.5px solid var(--navy);
+    border-radius: 999px;
+    font-weight: 700;
+    box-shadow: 0 4px 0 var(--navy);
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+    cursor: pointer;
+  }
+  .comic-btn:active:not(:disabled) {
+    transform: translateY(3px);
+    box-shadow: 0 1px 0 var(--navy);
+  }
+  .comic-btn:disabled {
+    background: #46426e !important;
+    color: #9d98c9 !important;
+    border-color: #343059 !important;
+    box-shadow: none !important;
+    cursor: not-allowed;
+  }
+  .comic-input {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 14px;
+    border: 2.5px solid var(--navy);
+    background: #ffffff;
+    color: var(--navy);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.4;
+    outline: none;
+    user-select: text;
+    -webkit-user-select: text;
+    touch-action: manipulation;
+    cursor: text;
+  }
+  .comic-input:focus {
+    border-color: var(--indigo);
+    box-shadow: 0 0 0 3px rgba(75, 41, 242, 0.22);
+  }
+  /* กรอบมือถือจำลอง & รองรับหน้าจอมือถือเต็มรูปแบบ */
+  .phone-shell {
+    width: 100%;
+    max-width: 430px;
+    height: min(840px, 94dvh);
+    background: var(--navy);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    border-radius: 32px;
+    border: 3px solid var(--navy);
+    box-shadow: 0 18px 48px rgba(25, 20, 60, 0.35);
+  }
+  @media (max-width: 640px) {
+    html, body {
+      background: var(--navy);
+    }
+    .phone-shell {
+      max-width: 100%;
+      height: 100dvh;
+      border-radius: 0;
+      border: none;
+      box-shadow: none;
+    }
+  }
+
+  /* ปฏิทิน */
+  .cal-cell {
+    aspect-ratio: 1 / 1.18;
+    border: 2px solid transparent;
+    border-radius: 14px;
+    background: #f3f0ff;
+    color: var(--navy);
+    padding: 3px 2px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .cal-cell:hover { border-color: var(--navy); transform: translateY(-1px); }
+  .cal-cell.is-ot { background: linear-gradient(155deg, #ffe2c4, #ffb6d5 58%, #b3a8ff); }
+  .cal-cell.is-leave {
+    background: #10b981;
+    border-color: #047857;
+    color: #ffffff;
+  }
+  .cal-cell.is-leave b { color: #ffffff; }
+  .cal-cell.is-today { border: 2.5px solid var(--navy); box-shadow: 0 2px 0 var(--navy); }
+  .cal-cell.is-faded { opacity: 0.36; pointer-events: none; }
+
+  /* แถบเมนูด้านล่าง */
+  .nav-item.active .nav-bubble {
+    width: 50px;
+    height: 50px;
+    border-radius: 999px;
+    background: #ffffff;
+    border: 2.5px solid var(--navy);
+    color: var(--indigo);
+    transform: translateY(-18px);
+    margin-bottom: -18px;
+    box-shadow: 0 3px 0 var(--navy);
+  }
+
+  /* คารูเซลการ์ดอนุมัติแบบปัดซ้าย-ขวา และปัดลงดูรายละเอียด */
+  .carousel-stage {
+    position: relative;
+    height: 270px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: none;
+    user-select: none;
+    overflow: hidden;
+  }
+  .req-card-3d {
+    position: absolute;
+    width: 215px;
+    height: 225px;
+    border-radius: 26px;
+    border: 3px solid var(--navy);
+    transition: transform 0.28s cubic-bezier(.22,1,.36,1), opacity 0.25s ease, box-shadow 0.25s ease;
+    cursor: grab;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 14px;
+  }
+  .req-card-3d.dragging {
+    transition: none;
+    cursor: grabbing;
+  }
+  .req-card-3d.is-center {
+    z-index: 10;
+    box-shadow: 0 0 0 4px rgba(255, 185, 138, 0.55), 0 12px 26px rgba(0, 0, 0, 0.45);
+  }
+  .req-card-3d.is-side {
+    z-index: 4;
+    opacity: 0.72;
+    cursor: pointer;
+  }
+  .drop-slot-outline {
+    width: 215px;
+    height: 225px;
+    border-radius: 26px;
+    border: 2.5px dashed rgba(255, 255, 255, 0.32);
+    background: rgba(255, 255, 255, 0.04);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 12px;
+  }
+
+  /* ซ่อน Scrollbar เพื่อความสวยงาม */
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+</style>
+</head>
+<body class="flex flex-col items-center justify-center p-0 sm:p-4 text-white">
+
+  <!-- ตัวเครื่องมือถือจำลอง -->
+  <div class="phone-shell">
+
+    <!-- หน้าจอ Login / สร้างรหัสพนักงานเองได้ และ Login ผู้อนุมัติ SM2080797 -->
+    <div id="loginScreen" class="absolute inset-0 bg-[#19143c] z-30 flex flex-col justify-between overflow-y-auto no-scrollbar">
+      <div class="bg-white text-[#19143c] px-6 pt-6 pb-5 text-center relative">
+        <div id="loginMascot" class="w-16 h-16 mx-auto mb-1 flex items-center justify-center"></div>
+        <div class="text-3xl font-bold tracking-tight">oto</div>
+        <p class="text-xs text-[#7a76a3] mt-0.5">เช็คอิน · บันทึกโอที · ลาพักร้อน</p>
+        <svg class="absolute left-0 top-full w-full h-7 fill-white block" viewBox="0 0 400 40" preserveAspectRatio="none">
+          <path d="M0 0H400V10C380 10 378 34 354 34S328 12 300 12 270 28 246 28 222 8 196 8 170 30 144 30 118 10 92 10 66 32 42 32 18 12 0 12Z"/>
+        </svg>
+      </div>
+
+      <div class="px-6 pt-8 pb-6 flex-1 flex flex-col justify-center">
+        <!-- แถบสลับโหมด: เข้าสู่ระบบ vs สร้างรหัสพนักงานใหม่ -->
+        <div class="grid grid-cols-2 gap-2 mb-3">
+          <button type="button" id="tabAuthLogin" onclick="setAuthMode('login')" class="py-2 px-3 rounded-full border-2 border-[#19143c] bg-[#ffb98a] text-[#19143c] font-bold text-xs cursor-pointer shadow-[0_3px_0_#2d2666]">
+            🔑 เข้าสู่ระบบ
+          </button>
+          <button type="button" id="tabAuthRegister" onclick="setAuthMode('register')" class="py-2 px-3 rounded-full border-2 border-white/25 bg-white/10 text-white font-bold text-xs cursor-pointer">
+            ✨ สร้างรหัสพนักงาน
+          </button>
+        </div>
+
+        <div class="mb-2">
+          <label class="block text-xs font-semibold text-[#d6d1ff] mb-1">รหัสพนักงาน / รหัสผู้อนุมัติ</label>
+          <input id="inpEmpId" oninput="onAuthEmpIdChange()" class="comic-input !mb-0" placeholder="เช่น EMP-0231 หรือ SM2080797">
+        </div>
+
+        <!-- แถบแจ้งเตือนเมื่อกรอกรหัสผู้อนุมัติ SM2080797 (ไม่ต้องกรอกชื่อ) -->
+        <div id="smBadgeHint" class="hidden mb-2 bg-[#c9f7e2] text-[#115c33] border-2 border-[#19143c] rounded-xl px-3 py-1.5 text-[11px] font-bold">
+          🛡️ ผู้อนุมัติหลัก: นาย ณัฐวุฒิ ชุมหิรัญ (ไม่ต้องกรอกชื่อ ใส่รหัสผ่านได้เลย)
+        </div>
+
+        <!-- ช่องชื่อ-นามสกุล (แสดงเฉพาะตอนกด "สร้างรหัสพนักงาน" ใหม่เท่านั้น ตอนเข้าสู่ระบบไม่ต้องกรอก) -->
+        <div id="employeeNameFields" class="hidden">
+          <div class="mb-2">
+            <label class="block text-xs font-semibold text-[#d6d1ff] mb-1">ชื่อ</label>
+            <input id="inpFirst" class="comic-input !mb-0" placeholder="กรอกชื่อจริง">
+          </div>
+          <div class="mb-2">
+            <label class="block text-xs font-semibold text-[#d6d1ff] mb-1">นามสกุล</label>
+            <input id="inpLast" class="comic-input !mb-0" placeholder="กรอกนามสกุล">
+          </div>
+        </div>
+
+        <!-- ช่อง Password (ใช้ได้ทั้งผู้อนุมัติ SM2080797 และพนักงานที่ตั้งรหัสเอง) -->
+        <div class="mb-2">
+          <label id="lblPassword" class="block text-xs font-semibold text-[#ffb98a] mb-1">รหัสผ่าน (Password)</label>
+          <input id="inpPassword" type="password" class="comic-input !mb-0" placeholder="กรอกรหัสผ่านของคุณ">
+        </div>
+
+        <p id="authHelperText" class="text-[11px] text-[#b5b0e3] mt-1 mb-3 leading-relaxed">
+          * เข้าสู่ระบบด้วย <b>รหัสพนักงาน</b> และ <b>รหัสผ่าน</b> ได้ทันที (ไม่ต้องใส่ชื่อ-นามสกุล ระบบจะดึงชื่อแสดงในโปรไฟล์และคำขอให้อัตโนมัติ)
+        </p>
+
+        <div id="cloudSyncBadge" class="mb-2.5 px-3 py-1.5 rounded-xl bg-white/10 border border-white/20 text-[11px] text-[#c9f7e2] flex items-center justify-between">
+          <span>☁️ สถานะฐานข้อมูลออนไลน์:</span>
+          <b id="cloudSyncStatusText">กำลังเชื่อมต่อ...</b>
+        </div>
+
+        <button id="btnAuthSubmit" onclick="handleLogin()" class="comic-btn w-full py-3 bg-[#ffb98a] text-[#19143c] text-sm">
+          เข้าใช้งานระบบ
+        </button>
+
+        <button type="button" onclick="triggerInstallApp()" class="mt-3 w-full py-2.5 px-3 rounded-full border-2 border-[#c9f7e2] bg-white/10 hover:bg-white/20 text-[#c9f7e2] text-xs font-bold cursor-pointer">
+          📲 ติดตั้งแอป oto ลงเครื่อง (iOS / Android / คอมฯ)
+        </button>
+      </div>
+    </div>
+
+    <input type="file" id="fileUpload" accept="image/*" hidden>
+    <input type="file" id="cameraCaptureInput" accept="image/*" capture="environment" hidden>
+    <input type="file" id="profilePhotoUpload" accept="image/*" hidden>
+
+    <!-- Toast แจ้งเตือนสั้นๆ -->
+    <div id="toastBox" class="absolute bottom-20 left-1/2 -translate-x-1/2 bg-white text-[#19143c] border-2.5 border-[#19143c] shadow-[0_4px_0_#2d2666] px-4 py-2 rounded-full text-xs font-bold opacity-0 pointer-events-none transition-opacity duration-200 z-50 max-w-[88%] text-center"></div>
+
+    <!-- Modal ดูรูปหลักฐานเช็คเอาท์ขนาดเต็ม (สำหรับหัวหน้า SM) -->
+    <div id="photoViewerModal" onclick="closePhotoViewer()" class="hidden fixed inset-0 bg-[#19143c]/90 backdrop-blur-[2px] z-[60] flex-col items-center justify-center p-4">
+      <div onclick="event.stopPropagation()" class="w-full max-w-[390px] comic-card p-3">
+        <div class="flex items-center justify-between mb-2">
+          <b id="photoViewerCaption" class="text-xs text-[#19143c]">หลักฐานรูปเช็คเอาท์</b>
+          <button type="button" onclick="closePhotoViewer()" class="w-7 h-7 rounded-full border-2 border-[#19143c] bg-[#ffe0e5] font-bold text-xs text-[#8f1526] cursor-pointer">✕</button>
+        </div>
+        <img id="photoViewerImg" alt="รูปหลักฐานเช็คเอาท์ขยาย" class="w-full max-h-[60vh] object-contain rounded-xl border-2 border-[#19143c] bg-[#19143c]">
+      </div>
+    </div>
+
+    <!-- Sheet แสดงรายละเอียดคำขอเมื่อคลิกปุ่มหรือปัดการ์ดลง (สำหรับหัวหน้า SM) -->
+    <div id="approvalDetailSheet" class="absolute inset-0 bg-[#19143c] z-50 hidden flex-col">
+      <div class="flex items-center gap-2.5 px-4 pt-3.5 pb-2 flex-none border-b border-white/10">
+        <button type="button" onclick="closeApprovalDetail()" class="w-9 h-9 rounded-full bg-white text-[#19143c] border-2 border-[#19143c] font-bold text-lg flex items-center justify-center cursor-pointer">
+          ‹
+        </button>
+        <h2 id="approvalDetailHeading" class="text-base font-bold flex-1 truncate">รายละเอียดการขอ OT</h2>
+        <span class="px-2.5 py-0.5 rounded-full border border-[#19143c] bg-[#ffb98a] text-[#19143c] text-[10px] font-bold flex-none">SM208797</span>
+      </div>
+      <div id="approvalDetailBody" class="flex-1 overflow-y-auto no-scrollbar px-4 pt-3 pb-5"></div>
+    </div>
+
+    <!-- ส่วนหัว เนื้อหาหลัก และแถบเมนูด้านล่าง -->
+    <header id="appHeader" class="flex-none"></header>
+    <main id="appMain" class="flex-1 overflow-y-auto no-scrollbar px-4 pt-8 pb-24"></main>
+    <nav id="appNav" class="fixed sm:absolute left-0 right-0 bottom-2 px-3 z-20 max-w-[410px] mx-auto"></nav>
+
+    <!-- Sheet บันทึกประจำวัน (OT และ ลาพักร้อน) -->
+    <div id="daySheet" class="absolute inset-0 bg-[#19143c] z-40 hidden flex-col">
+      <div class="flex items-center justify-between gap-2 px-4 pt-3.5 pb-2.5 flex-none border-b border-white/10">
+        <div class="flex items-center gap-2.5">
+          <button type="button" onclick="closeDaySheet()" class="w-9 h-9 rounded-full bg-white text-[#19143c] border-2 border-[#19143c] font-bold text-lg flex items-center justify-center cursor-pointer">
+            ‹
+          </button>
+          <h2 class="text-base font-bold">บันทึกประจำวัน</h2>
+        </div>
+        <div id="sheetStatusChip"></div>
+      </div>
+
+      <div class="flex-1 overflow-y-auto no-scrollbar px-4 pt-3 pb-6 space-y-3">
+        <!-- กล่องอารมณ์ประจำวัน -->
+        <div class="comic-card p-3 flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div id="sheetMoodBox" class="w-16 h-16 rounded-2xl bg-[#f3f0ff] border-2 border-[#19143c] flex items-center justify-center"></div>
+            <div>
+              <span class="block text-[10px] font-bold text-[#7a76a3]">อารมณ์วันนี้</span>
+              <b id="sheetMoodLabel" class="text-sm text-[#19143c]">ยิ้มสู้ / อารมณ์ดี</b>
+            </div>
+          </div>
+          <button type="button" onclick="cycleMood()" class="px-3 py-1.5 rounded-full border-2 border-[#19143c] bg-[#19143c] text-white text-xs font-bold cursor-pointer">
+            แตะเปลี่ยนสีหน้า 🎲
+          </button>
+        </div>
+
+        <!-- การ์ดวันที่และสรุปชั่วโมง OT / ช่วงวันลา -->
+        <div class="rounded-3xl bg-gradient-to-r from-[#4b29f2] to-[#6d4aff] border-2.5 border-[#19143c] shadow-[0_4px_0_#2d2666] p-3.5 text-white flex items-center gap-3">
+          <div class="w-14 h-16 rounded-2xl bg-white text-[#19143c] border-2 border-[#19143c] flex flex-col items-center justify-between overflow-hidden flex-none">
+            <span id="calMonthBadge" class="w-full text-center text-[10px] font-bold bg-[#ffb98a] py-0.5">พ.ย.</span>
+            <b id="calDayBadge" class="text-xl font-extrabold leading-none">19</b>
+            <span id="calWeekBadge" class="text-[10px] font-bold text-[#7a76a3] pb-0.5">พฤ</span>
+          </div>
+          <div class="min-w-0 flex-1">
+            <div id="sheetFullDate" class="text-xs text-white/90 truncate"></div>
+            <div id="sheetHeroTitle" class="text-xs font-bold text-[#c9f7e2] mt-0.5">ชั่วโมงโอทีสุทธิ</div>
+            <div id="sheetHeroValue" class="text-xl font-extrabold text-[#ffb98a] leading-tight">+2 ชม.</div>
+          </div>
+        </div>
+
+        <!-- ปุ่มเลือกประเภทการบันทึก -->
+        <div>
+          <label class="block text-xs font-bold text-[#d6d1ff] mb-1.5">เลือกประเภทการบันทึก</label>
+          <div class="grid grid-cols-2 gap-2.5">
+            <button type="button" id="btnModeOT" onclick="setEntryMode('ot')" class="py-2.5 px-3 rounded-2xl border-2.5 border-[#19143c] bg-[#ffb98a] text-[#19143c] font-bold text-sm cursor-pointer">
+              ⚡ ทำโอที
+            </button>
+            <button type="button" id="btnModeLeave" onclick="setEntryMode('leave')" class="py-2.5 px-3 rounded-2xl border-2.5 border-white/25 bg-white/10 text-white font-bold text-sm cursor-pointer">
+              🌴 ลาพักร้อน
+            </button>
+          </div>
+        </div>
+
+        <!-- ฟอร์มบันทึก OT -->
+        <div id="formOT" class="space-y-2.5">
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label class="block text-xs font-semibold text-[#d6d1ff] mb-1">เวลาเข้างาน (24 ชม.)</label>
+              <input id="inpTimeIn" oninput="onManualTimeInput(this)" class="comic-input !font-bold text-center" placeholder="09:00">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-[#d6d1ff] mb-1">เวลาเลิกงาน (24 ชม.)</label>
+              <input id="inpTimeOut" oninput="onManualTimeInput(this)" class="comic-input !font-bold text-center" placeholder="20:00">
+            </div>
+          </div>
+
+          <p class="text-[11px] text-[#b5b0e3] leading-relaxed">
+            พิมพ์เวลาแบบ 24 ชม. เช่น <b>09:00</b> หรือ <b>20:30</b> · สูตร OT = เวลาทำงาน − 9 ชม. · ส่งอนุมัติที่ <b>SM208797</b>
+          </p>
+
+          <div>
+            <label class="block text-xs font-semibold text-[#d6d1ff] mb-1">รายละเอียดงานที่ทำ *</label>
+            <textarea id="inpWorkNote" rows="2" oninput="validateForm()" class="comic-input" placeholder="เช่น ตรวจสต็อกสิ้นเดือน, ปิดยอดขาย, อัปเดตระบบ (จำเป็นต้องกรอก)"></textarea>
+          </div>
+
+          <div class="comic-card p-3 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-[#19143c]">รูปหลักฐานเช็คเอาท์ * (จำเป็นต้องแนบ)</span>
+              <button type="button" id="btnClearPhoto" onclick="clearPhoto()" class="hidden text-[11px] font-bold text-[#8f1526] underline cursor-pointer">ลบรูป</button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <button type="button" onclick="openPhoneCamera()" class="py-2 px-2 rounded-xl border-2 border-[#19143c] bg-[#c9f7e2] hover:bg-[#9ef0cb] text-[11px] font-bold text-[#19143c] cursor-pointer">
+                📸 ถ่ายด้วยกล้อง
+              </button>
+              <button type="button" onclick="document.getElementById('fileUpload').click()" class="py-2 px-2 rounded-xl border-2 border-[#19143c] bg-[#f3f0ff] hover:bg-[#e5deff] text-[11px] font-bold text-[#19143c] cursor-pointer">
+                🖼️ อัปโหลดรูป
+              </button>
+            </div>
+
+            <div id="liveCameraBox" class="hidden space-y-1.5 rounded-xl border-2 border-[#19143c] bg-[#19143c] p-2">
+              <video id="liveCameraVideo" autoplay playsinline muted class="w-full max-h-44 object-cover rounded-lg bg-black"></video>
+              <div class="grid grid-cols-2 gap-1.5">
+                <button type="button" onclick="captureFromLiveCamera()" class="py-1.5 rounded-lg bg-[#36c78c] text-[#19143c] border border-[#19143c] text-xs font-bold cursor-pointer">
+                  ● กดถ่ายภาพ
+                </button>
+                <button type="button" onclick="stopLiveCamera()" class="py-1.5 rounded-lg bg-[#ffe0e5] text-[#8f1526] border border-[#19143c] text-xs font-bold cursor-pointer">
+                  ✕ ปิดกล้อง
+                </button>
+              </div>
+            </div>
+
+            <img id="photoPreview" alt="ตัวอย่างรูปหลักฐานเช็คเอาท์" class="hidden w-full max-h-40 object-cover rounded-xl border-2 border-[#19143c]">
+          </div>
+        </div>
+
+        <!-- ฟอร์มบันทึกวันลาพักร้อน -->
+        <div id="formLeave" class="hidden space-y-2.5">
+          <div class="comic-card p-3">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-bold text-[#7a76a3]">👤 เจ้าของโปรไฟล์ที่ขอลา</span>
+              <span class="px-2 py-0.5 rounded-full bg-[#ece8ff] border border-[#19143c] text-[10px] font-bold text-[#19143c]">ล็อกตามโปรไฟล์</span>
+            </div>
+            <div id="leaveOwnerNameText" class="text-sm font-extrabold text-[#19143c] mt-1">ปกฤษฎา ไชยโย (EMP-0231)</div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2.5">
+            <div onclick="openDateFieldPicker('inpLeaveFrom')" class="comic-card p-2.5 cursor-pointer hover:border-[#4b29f2]">
+              <div class="flex items-center justify-between text-[11px] font-bold text-[#7a76a3]">
+                <span>ลาตั้งแต่วันที่</span>
+                <span>📅</span>
+              </div>
+              <div id="dispLeaveFrom" class="text-xs font-extrabold text-[#19143c] mt-1">เลือกวันเริ่มลา</div>
+              <input id="inpLeaveFrom" type="date" onchange="onLeaveDateChange('from')" class="sr-only">
+            </div>
+
+            <div onclick="openDateFieldPicker('inpLeaveTo')" class="comic-card p-2.5 cursor-pointer hover:border-[#4b29f2]">
+              <div class="flex items-center justify-between text-[11px] font-bold text-[#7a76a3]">
+                <span>ถึงวันที่</span>
+                <span>📅</span>
+              </div>
+              <div id="dispLeaveTo" class="text-xs font-extrabold text-[#19143c] mt-1">เลือกถึงวันที่</div>
+              <input id="inpLeaveTo" type="date" onchange="onLeaveDateChange('to')" class="sr-only">
+            </div>
+          </div>
+
+          <!-- ป๊อปอัปปฏิทินสำหรับจิ้มเลือกวันเริ่มลา / ถึงวันที่ -->
+          <div id="leaveDatePopover" class="hidden comic-card p-3 space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <b id="leavePopTitle" class="text-xs text-[#19143c]">เลือกวันเริ่มลาพักร้อน</b>
+              <button type="button" onclick="closeLeaveCalendarPicker()" class="text-xs font-bold text-[#7a76a3] hover:text-[#19143c] cursor-pointer">✕ ปิด</button>
+            </div>
+            <div class="flex items-center justify-between bg-[#f3f0ff] border border-[#19143c] rounded-xl px-2.5 py-1.5">
+              <button type="button" onclick="shiftLeavePickerMonth(-1)" class="w-7 h-7 rounded-lg bg-white border border-[#19143c] font-bold text-xs cursor-pointer">‹</button>
+              <span id="leavePopMonthLabel" class="text-xs font-bold text-[#19143c]">พฤศจิกายน 2569</span>
+              <button type="button" onclick="shiftLeavePickerMonth(1)" class="w-7 h-7 rounded-lg bg-white border border-[#19143c] font-bold text-xs cursor-pointer">›</button>
+            </div>
+            <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-[#7a76a3]">
+              <span>อา</span><span>จ</span><span>อ</span><span>พ</span><span>พฤ</span><span>ศ</span><span>ส</span>
+            </div>
+            <div id="leavePopGrid" class="grid grid-cols-7 gap-1"></div>
+            <div class="flex items-center justify-between pt-1 border-t border-dashed border-[#ded8ff]">
+              <button type="button" onclick="clearLeavePickerTarget()" class="text-[11px] font-bold text-[#7a76a3] hover:text-[#19143c] cursor-pointer">ล้างค่า</button>
+              <button type="button" onclick="selectLeavePickerToday()" class="px-2.5 py-1 rounded-lg bg-[#ece8ff] border border-[#19143c] text-[11px] font-bold text-[#4b29f2] cursor-pointer">วันนี้</button>
+            </div>
+          </div>
+
+          <!-- ปุ่มเลือกจำนวนวันลาติดกันด่วน (สูงสุด 5 วัน) -->
+          <div class="comic-card p-2.5 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold text-[#19143c]">เลือกจำนวนวันลาติดกัน (สูงสุด 5 วัน)</span>
+              <span id="leaveDaysCountBadge" class="text-xs font-bold text-[#4b29f2]">เลือกวันลา: 1 / 5 วัน</span>
+            </div>
+            <div class="grid grid-cols-4 gap-1.5">
+              <button type="button" onclick="setLeaveDuration(1)" class="py-1.5 rounded-xl border-2 border-[#19143c] bg-[#f3f0ff] hover:bg-[#ffb98a] text-xs font-bold text-[#19143c] cursor-pointer">1 วัน</button>
+              <button type="button" onclick="setLeaveDuration(2)" class="py-1.5 rounded-xl border-2 border-[#19143c] bg-[#f3f0ff] hover:bg-[#ffb98a] text-xs font-bold text-[#19143c] cursor-pointer">2 วัน</button>
+              <button type="button" onclick="setLeaveDuration(3)" class="py-1.5 rounded-xl border-2 border-[#19143c] bg-[#f3f0ff] hover:bg-[#ffb98a] text-xs font-bold text-[#19143c] cursor-pointer">3 วัน</button>
+              <button type="button" onclick="setLeaveDuration(5)" class="py-1.5 rounded-xl border-2 border-[#19143c] bg-[#c9f7e2] hover:bg-[#36c78c] text-xs font-bold text-[#19143c] cursor-pointer">5 วัน</button>
+            </div>
+            <p class="text-[11px] text-[#7a76a3]">ระบบจะตรวจสอบวันลาทับซ้อนกับพนักงานคนอื่นให้อัตโนมัติ</p>
+          </div>
+        </div>
+
+        <!-- กล่องแจ้งเตือนข้อผิดพลาด / วันลาทับซ้อน -->
+        <div id="alertBox" class="hidden rounded-2xl border-2 border-[#ff5c72] bg-[#ffd6dc] text-[#8f1526] px-3 py-2 text-xs font-bold"></div>
+
+        <!-- แถบสถานะความพร้อมและปุ่มส่งคำขอ -->
+        <div class="comic-card p-3 space-y-2.5">
+          <p id="progressHint" class="text-xs font-semibold text-[#7a76a3] text-center"></p>
+          <button type="button" id="btnSaveEntry" onclick="saveCurrentEntry()" class="comic-btn w-full py-3 bg-[#4b29f2] text-white text-sm">
+            ส่งคำขอ OT
+          </button>
+          <button type="button" id="btnDeleteEntry" onclick="deleteCurrentEntry()" class="hidden w-full py-2 rounded-full border-2 border-[#ff5c72] bg-[#ffd6dc] text-[#8f1526] text-xs font-bold cursor-pointer">
+            ลบรายการวันนี้
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+  import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+  import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+  const appId = typeof __app_id !== 'undefined' ? __app_id : 'oto-default-app';
+  const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+
+  window.cloudStore = {
+    ready: false,
+    db: null,
+    auth: null,
+    user: null,
+    saveAccount: async () => {},
+    deleteAccount: async () => {},
+    saveRequest: async () => {},
+    deleteRequest: async () => {},
+    saveCalendarItem: async () => {},
+    deleteCalendarItem: async () => {}
+  };
+
+  function updateCloudStatusBadge(text, ok = true) {
+    const el = document.getElementById('cloudSyncStatusText');
+    if (el) {
+      el.textContent = text;
+      el.className = ok ? 'text-[#36c78c] font-bold' : 'text-[#ffb98a] font-bold';
+    }
+  }
+
+  async function initCloudDatabase() {
+    if (!firebaseConfig) {
+      updateCloudStatusBadge('พร้อมใช้งาน (โหมดออฟไลน์ชั่วคราว)', false);
+      return;
+    }
+    try {
+      const fbApp = initializeApp(firebaseConfig);
+      const auth = getAuth(fbApp);
+      const db = getFirestore(fbApp);
+
+      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+        await signInWithCustomToken(auth, __initial_auth_token);
+      } else {
+        await signInAnonymously(auth);
+      }
+
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+
+      window.cloudStore.db = db;
+      window.cloudStore.auth = auth;
+      window.cloudStore.user = currentUser;
+      window.cloudStore.ready = true;
+      updateCloudStatusBadge('ออนไลน์ · ซิงค์ทุกเครื่องอัตโนมัติ ✓', true);
+
+      const accountsCol = collection(db, 'artifacts', appId, 'public', 'data', 'oto_accounts');
+      const requestsCol = collection(db, 'artifacts', appId, 'public', 'data', 'oto_requests');
+      const calItemsCol = collection(db, 'artifacts', appId, 'public', 'data', 'oto_calendar_items');
+
+      window.cloudStore.saveAccount = async (acc) => {
+        if (!window.cloudStore.user || !acc?.empId) return;
+        const cleanId = acc.empId.trim().toUpperCase();
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'oto_accounts', cleanId), {
+          empId: cleanId,
+          firstName: acc.firstName || '',
+          lastName: acc.lastName || '',
+          password: acc.password || '',
+          avatar: acc.avatar || ''
+        });
+      };
+
+      window.cloudStore.deleteAccount = async (empId) => {
+        if (!window.cloudStore.user || !empId) return;
+        const cleanId = empId.trim().toUpperCase();
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'oto_accounts', cleanId));
+      };
+
+      window.cloudStore.saveRequest = async (req) => {
+        if (!window.cloudStore.user || !req?.id) return;
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'oto_requests', req.id), {
+          ...req,
+          updatedAt: Date.now()
+        });
+      };
+
+      window.cloudStore.deleteRequest = async (reqId) => {
+        if (!window.cloudStore.user || !reqId) return;
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'oto_requests', reqId));
+      };
+
+      window.cloudStore.saveCalendarItem = async (dateKey, item) => {
+        if (!window.cloudStore.user || !dateKey || !item) return;
+        const empKey = (item.empId || 'EMP').trim().toUpperCase();
+        const docId = `${empKey}_${dateKey}`;
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'oto_calendar_items', docId), {
+          ...item,
+          dateKey,
+          empId: empKey
+        });
+      };
+
+      window.cloudStore.deleteCalendarItem = async (empId, dateKey) => {
+        if (!window.cloudStore.user || !dateKey) return;
+        const empKey = (empId || 'EMP').trim().toUpperCase();
+        const docId = `${empKey}_${dateKey}`;
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'oto_calendar_items', docId));
+      };
+
+      onSnapshot(
+        accountsCol,
+        (snap) => {
+          const latest = {};
+          snap.forEach((d) => {
+            const data = d.data();
+            if (data && data.empId) {
+              latest[data.empId.trim().toUpperCase()] = data;
+            }
+          });
+          if (typeof window.syncAccountsFromCloud === 'function') {
+            window.syncAccountsFromCloud(latest);
+          }
+        },
+        (err) => {
+          console.error('Accounts sync error:', err);
+        }
+      );
+
+      onSnapshot(
+        requestsCol,
+        (snap) => {
+          const list = [];
+          snap.forEach((d) => {
+            const data = d.data();
+            if (data && data.id) list.push(data);
+          });
+          list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+          if (typeof window.syncRequestsFromCloud === 'function') {
+            window.syncRequestsFromCloud(list);
+          }
+        },
+        (err) => {
+          console.error('Requests sync error:', err);
+        }
+      );
+
+      onSnapshot(
+        calItemsCol,
+        (snap) => {
+          const allItems = [];
+          snap.forEach((d) => {
+            const data = d.data();
+            if (data && data.dateKey) allItems.push(data);
+          });
+          if (typeof window.syncCalendarFromCloud === 'function') {
+            window.syncCalendarFromCloud(allItems);
+          }
+        },
+        (err) => {
+          console.error('Calendar sync error:', err);
+        }
+      );
+    } catch (err) {
+      console.error('Cloud init error:', err);
+      updateCloudStatusBadge('เชื่อมต่อฐานข้อมูลไม่สำเร็จ', false);
+    }
+  }
+
+  initCloudDatabase();
+</script>
+
+<script>
+  const TH_MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  const TH_SHORT = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const TH_DAYS = ['อา','จ','อ','พ','พฤ','ศ','ส'];
+  const TH_FULL_DAYS = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+  const BKK_TZ = 'Asia/Bangkok';
+
+  function getBangkokTodayYMD() {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: BKK_TZ,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(new Date());
+    const map = Object.fromEntries(parts.map(p => [p.type, p.value]));
+    return `${map.year}-${map.month}-${map.day}`;
+  }
+
+  function getBangkokLiveClock() {
+    return new Intl.DateTimeFormat('th-TH', {
+      timeZone: BKK_TZ,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    }).format(new Date()) + ' น.';
+  }
+
+  function formatBangkokFullDate(ymdStr) {
+    const [y, m, d] = ymdStr.split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    return `วัน${TH_FULL_DAYS[dt.getUTCDay()]}ที่ ${d} ${TH_MONTHS[m - 1]} ${y + 543}`;
+  }
+
+  const TODAY = getBangkokTodayYMD();
+
+  const MOODS = [
+    {
+      label: 'ยิ้มสู้ / อารมณ์ดี',
+      svg: `<svg viewBox="0 0 100 100" fill="none" class="w-full h-full">
+        <circle cx="50" cy="54" r="32" fill="#fff" stroke="#19143c" stroke-width="3.2"/>
+        <path d="M22 44C20 26 36 16 54 18C68 20 79 30 78 45C73 41 66 39 58 40C51 41 46 37 40 39C33 41 27 42 22 44Z" fill="#19143c"/>
+        <circle cx="38" cy="56" r="5" fill="#19143c"/><circle cx="36.5" cy="54" r="1.7" fill="#fff"/>
+        <circle cx="62" cy="56" r="5" fill="#19143c"/><circle cx="60.5" cy="54" r="1.7" fill="#fff"/>
+        <ellipse cx="29" cy="62" rx="4.5" ry="2.5" fill="#ffb6d5"/>
+        <ellipse cx="71" cy="62" rx="4.5" ry="2.5" fill="#ffb6d5"/>
+        <path d="M44 65Q47 69 50 65Q53 69 56 65" stroke="#19143c" stroke-width="2.8" stroke-linecap="round"/>
+      </svg>`
+    },
+    {
+      label: 'ง่วงนอน / พักผ่อน',
+      svg: `<svg viewBox="0 0 100 100" fill="none" class="w-full h-full">
+        <circle cx="50" cy="56" r="31" fill="#fff" stroke="#19143c" stroke-width="3.2"/>
+        <path d="M23 46C22 28 38 19 55 21C69 23 78 33 77 47C70 43 62 42 54 43C46 44 35 43 23 46Z" fill="#19143c"/>
+        <path d="M32 58Q38 63 44 58" stroke="#19143c" stroke-width="3" stroke-linecap="round"/>
+        <path d="M56 58Q62 63 68 58" stroke="#19143c" stroke-width="3" stroke-linecap="round"/>
+        <path d="M74 22H84L74 32H84" stroke="#4b29f2" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>`
+    },
+    {
+      label: 'มุ่งมั่น / ลุยงานโอที',
+      svg: `<svg viewBox="0 0 100 100" fill="none" class="w-full h-full">
+        <circle cx="50" cy="55" r="31" fill="#fff" stroke="#19143c" stroke-width="3.2"/>
+        <path d="M23 45C22 27 38 18 55 20C69 22 78 32 77 46C68 42 58 42 48 44C39 45 31 44 23 45Z" fill="#19143c"/>
+        <path d="M31 49L43 53M69 49L57 53" stroke="#19143c" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="38" cy="57" r="4.5" fill="#19143c"/><circle cx="62" cy="57" r="4.5" fill="#19143c"/>
+        <path d="M43 68Q50 72 57 68" stroke="#19143c" stroke-width="2.8" stroke-linecap="round"/>
+      </svg>`
+    },
+    {
+      label: 'ตกใจ / งานด่วนเข้า!',
+      svg: `<svg viewBox="0 0 100 100" fill="none" class="w-full h-full">
+        <circle cx="50" cy="55" r="31" fill="#fff" stroke="#19143c" stroke-width="3.2"/>
+        <path d="M23 45C22 27 38 18 55 20C69 22 78 32 77 46C67 42 56 42 46 44C38 45 30 44 23 45Z" fill="#19143c"/>
+        <circle cx="38" cy="56" r="6.5" fill="#fff" stroke="#19143c" stroke-width="2.5"/><circle cx="38" cy="56" r="2.2" fill="#19143c"/>
+        <circle cx="62" cy="56" r="6.5" fill="#fff" stroke="#19143c" stroke-width="2.5"/><circle cx="62" cy="56" r="2.2" fill="#19143c"/>
+        <ellipse cx="50" cy="69" rx="4.5" ry="3.5" stroke="#19143c" stroke-width="2.6"/>
+        <path d="M77 20C81 18 85 21 83 25C82 27 80 28 80 30M80 34V35" stroke="#ff5c72" stroke-width="2.8" stroke-linecap="round"/>
+      </svg>`
+    }
+  ];
+
+  // ชุดไอคอนกราฟิกพาสเทลเรืองแสงสไตล์อวกาศ/ดวงดาวสำหรับปฏิทิน (สุ่มแสดงผล)
+  const COSMIC_ICONS = [
+    // 0: พระจันทร์เสี้ยวพาสเทลเรืองแสง
+    `<svg viewBox="0 0 64 64" fill="none" class="w-full h-full">
+      <defs>
+        <linearGradient id="cg0" x1="10" y1="10" x2="54" y2="54" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#ffd1a4"/><stop offset="50%" stop-color="#f598e6"/><stop offset="100%" stop-color="#7c74ff"/>
+        </linearGradient>
+      </defs>
+      <rect x="4" y="4" width="56" height="56" rx="16" fill="#21224a"/>
+      <path d="M36 14C25.5 14 17 22.5 17 33C17 43.5 25.5 52 36 52C42.2 52 47.7 49 51.1 44.4C48.8 45.2 46.3 45.6 43.7 45.6C32.8 45.6 24 36.8 24 25.9C24 21.3 25.6 17.1 28.2 13.8C30.7 13.9 33.3 14 36 14Z" fill="url(#cg0)"/>
+      <path d="M45 16L47 21L52 23L47 25L45 30L43 25L38 23L43 21Z" fill="#fff6cc"/>
+      <circle cx="37" cy="31" r="2" fill="#fff"/>
+    </svg>`,
+    // 1: น้องแมวกาแล็กซีตาโต
+    `<svg viewBox="0 0 64 64" fill="none" class="w-full h-full">
+      <defs>
+        <linearGradient id="cg1" x1="12" y1="16" x2="52" y2="50" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#3b428c"/><stop offset="100%" stop-color="#171836"/>
+        </linearGradient>
+      </defs>
+      <rect x="4" y="4" width="56" height="56" rx="16" fill="#21224a"/>
+      <path d="M18 46C16 37 19 29 23 25L21 15L29 21C32 20 36 20 39 21L47 15L45 25C49 29 51 37 48 46C44 50 22 50 18 46Z" fill="url(#cg1)" stroke="#8892ff" stroke-width="1.8"/>
+      <circle cx="29" cy="34" r="4.2" fill="#0d0e24"/><circle cx="27.8" cy="32.8" r="1.5" fill="#fff"/>
+      <circle cx="39" cy="34" r="4.2" fill="#0d0e24"/><circle cx="37.8" cy="32.8" r="1.5" fill="#fff"/>
+      <path d="M15 21L16.5 24.5L20 26L16.5 27.5L15 31L13.5 27.5L10 26L13.5 24.5Z" fill="#ffd9a8"/>
+      <circle cx="48" cy="22" r="1.8" fill="#a8e6ff"/>
+    </svg>`,
+    // 2: ดาวพาสเทลเรืองแสงยิ้มแฉ่ง
+    `<svg viewBox="0 0 64 64" fill="none" class="w-full h-full">
+      <defs>
+        <linearGradient id="cg2" x1="14" y1="12" x2="50" y2="52" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#ffcf9e"/><stop offset="55%" stop-color="#d58cff"/><stop offset="100%" stop-color="#619eff"/>
+        </linearGradient>
+      </defs>
+      <rect x="4" y="4" width="56" height="56" rx="16" fill="#21224a"/>
+      <path d="M32 13L37.5 24.2L49.8 26L40.9 34.6L43 46.8L32 41L21 46.8L23.1 34.6L14.2 26L26.5 24.2L32 13Z" fill="url(#cg2)"/>
+      <circle cx="28.5" cy="31" r="2" fill="#19143c"/>
+      <circle cx="35.5" cy="31" r="2" fill="#19143c"/>
+      <path d="M30 34.5Q32 36.8 34 34.5" stroke="#19143c" stroke-width="2" stroke-linecap="round"/>
+      <path d="M47 14L48.3 17L51.3 18.3L48.3 19.6L47 22.6L45.7 19.6L42.7 18.3L45.7 17Z" fill="#fff"/>
+    </svg>`,
+    // 3: ขวดโหลเก็บดวงดาว
+    `<svg viewBox="0 0 64 64" fill="none" class="w-full h-full">
+      <defs>
+        <linearGradient id="cg3" x1="20" y1="20" x2="44" y2="52" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#87c5ff" stop-opacity="0.45"/><stop offset="100%" stop-color="#c38cff" stop-opacity="0.7"/>
+        </linearGradient>
+      </defs>
+      <rect x="4" y="4" width="56" height="56" rx="16" fill="#21224a"/>
+      <rect x="25" y="12" width="14" height="5" rx="2.5" fill="#9fb8ff"/>
+      <rect x="19" y="18" width="26" height="33" rx="10" fill="url(#cg3)" stroke="#b3d4ff" stroke-width="2"/>
+      <path d="M28 28L29.5 31L32.8 31.5L30.4 33.8L31 37L28 35.4L25 37L25.6 33.8L23.2 31.5L26.5 31Z" fill="#ffd49c"/>
+      <path d="M37 36L38.2 38.5L41 38.9L39 40.8L39.5 43.5L37 42.2L34.5 43.5L35 40.8L33 38.9L35.8 38.5Z" fill="#ff9ed2"/>
+      <circle cx="35" cy="26" r="2.2" fill="#fff6cc"/>
+    </svg>`,
+    // 4: ลูกแก้วแสงเหนือออโรร่า
+    `<svg viewBox="0 0 64 64" fill="none" class="w-full h-full">
+      <defs>
+        <linearGradient id="cg4" x1="16" y1="16" x2="48" y2="50" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#7df5d4"/><stop offset="50%" stop-color="#69a3ff"/><stop offset="100%" stop-color="#9b6bff"/>
+        </linearGradient>
+      </defs>
+      <rect x="4" y="4" width="56" height="56" rx="16" fill="#21224a"/>
+      <circle cx="32" cy="33" r="18" fill="url(#cg4)"/>
+      <path d="M22 36C25 27 29 27 32 35C35 26 39 26 42 35" stroke="#e4fff9" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M44 13L45.5 16.5L49 18L45.5 19.5L44 23L42.5 19.5L39 18L42.5 16.5Z" fill="#fff"/>
+    </svg>`,
+    // 5: รอยเท้าแมวเรืองแสง
+    `<svg viewBox="0 0 64 64" fill="none" class="w-full h-full">
+      <defs>
+        <linearGradient id="cg5" x1="16" y1="16" x2="48" y2="50" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#ffb3da"/><stop offset="100%" stop-color="#8b82ff"/>
+        </linearGradient>
+      </defs>
+      <rect x="4" y="4" width="56" height="56" rx="16" fill="#21224a"/>
+      <ellipse cx="32" cy="39" rx="9" ry="7" fill="url(#cg5)"/>
+      <circle cx="21" cy="29" r="3.6" fill="url(#cg5)"/>
+      <circle cx="28.5" cy="24.5" r="3.8" fill="url(#cg5)"/>
+      <circle cx="36.5" cy="24.5" r="3.8" fill="url(#cg5)"/>
+      <circle cx="43.5" cy="29" r="3.6" fill="url(#cg5)"/>
+    </svg>`
+  ];
+
+  const APPROVER_ID = 'SM2080797';
+  const APPROVER_PASS = '2080797';
+  const APPROVER_NAME = { firstName: 'นาย ณัฐวุฒิ', lastName: 'ชุมหิรัญ' };
+
+  function renderMoodSvg(idx) {
+    return MOODS[idx % MOODS.length]?.svg || MOODS[0].svg;
+  }
+
+  function renderCosmicSvg(idx) {
+    return COSMIC_ICONS[idx % COSMIC_ICONS.length] || COSMIC_ICONS[0];
+  }
+
+  function getRandomCosmicIndex() {
+    return Math.floor(Math.random() * COSMIC_ICONS.length);
+  }
+
+  // บัญชีพนักงานที่ลงทะเบียนไว้ในระบบ (ซิงค์กับฐานข้อมูลออนไลน์)
+  const registeredAccounts = {};
+  let allCloudCalendarItems = [];
+
+  window.syncAccountsFromCloud = function(latestMap) {
+    Object.keys(registeredAccounts).forEach(k => delete registeredAccounts[k]);
+    Object.assign(registeredAccounts, latestMap);
+    if (state.user && state.user.empId && !isManager()) {
+      const me = registeredAccounts[state.user.empId.trim().toUpperCase()];
+      if (me) {
+        state.user.firstName = me.firstName;
+        state.user.lastName = me.lastName;
+        state.user.avatar = me.avatar || '';
+      }
+    }
+    onAuthEmpIdChange();
+    if (!document.getElementById('loginScreen').classList.contains('hidden')) return;
+    renderApp();
+  };
+
+  window.syncRequestsFromCloud = function(latestList) {
+    state.teamRequests = latestList;
+    if (!document.getElementById('loginScreen').classList.contains('hidden')) return;
+    renderApp();
+  };
+
+  window.syncCalendarFromCloud = function(allItems) {
+    allCloudCalendarItems = allItems;
+    rebuildVisibleCalendarItems();
+    if (!document.getElementById('loginScreen').classList.contains('hidden')) return;
+    renderApp();
+  };
+
+  function rebuildVisibleCalendarItems() {
+    const nextItems = {};
+    const myId = (state.user?.empId || '').trim().toUpperCase();
+    const manager = isManager();
+    const activeIds = new Set(Object.keys(registeredAccounts).map(k => k.trim().toUpperCase()));
+
+    allCloudCalendarItems.forEach((it) => {
+      const itemEmp = (it.empId || '').trim().toUpperCase();
+      if (itemEmp && itemEmp !== APPROVER_ID && activeIds.size > 0 && !activeIds.has(itemEmp)) return;
+      if (manager || itemEmp === myId) {
+        nextItems[it.dateKey] = it;
+      }
+    });
+    state.items = nextItems;
+  }
+
+  let authMode = 'login'; // 'login' | 'register'
+
+  // สถานะแอปพลิเคชันเริ่มต้น
+  const state = {
+    user: { firstName: '', lastName: '', empId: '', avatar: '' },
+    activeTab: 'cal',
+    approvalSubTab: 'pending',
+    carouselIndex: 0,
+    calSeed: 7,
+    year: Number(TODAY.split('-')[0]),
+    month: Number(TODAY.split('-')[1]) - 1,
+    items: {},
+    teamRequests: []
+  };
+
+  let currentDateKey = null;
+  let currentMode = 'ot';
+  let currentMood = 0;
+  let currentPhoto = '';
+  let rawCheckoutSourcePhoto = '';
+  let liveCameraStream = null;
+  let expandedHistoryId = null;
+  let leavePickerTarget = null; // 'from' | 'to' | null
+  let leavePickerYM = [Number(TODAY.split('-')[0]), Number(TODAY.split('-')[1]) - 1];
+
+  const isManager = () => Boolean(state.user && (state.user.empId || '').trim().toUpperCase() === APPROVER_ID);
+  const pad = (n) => String(n).padStart(2, '0');
+  const formatYMD = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
+  const parseDate = (s) => {
+    const [y, m, d] = s.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  };
+  const formatThaiShort = (s) => {
+    const d = parseDate(s);
+    return `${d.getDate()} ${TH_SHORT[d.getMonth()]} ${d.getFullYear() + 543}`;
+  };
+  const MAX_CONSECUTIVE_LEAVE_DAYS = 5;
+  const calcLeaveDays = (fromStr, toStr) => {
+    if (!fromStr || !toStr) return 0;
+    const f = parseDate(fromStr);
+    const t = parseDate(toStr);
+    const diffDays = Math.round((t.getTime() - f.getTime()) / 86400000) + 1;
+    return diffDays;
+  };
+  const addDaysYMD = (fromStr, addDays) => {
+    const d = parseDate(fromStr);
+    d.setDate(d.getDate() + addDays);
+    return formatYMD(d.getFullYear(), d.getMonth(), d.getDate());
+  };
+  const isValid24hTime = (t) => /^([01]\d|2[0-3]):([0-5]\d)$/.test((t || '').trim());
+  const getCellCosmicIndex = (y, m, d, it) => {
+    if (it && typeof it.cosmicIcon === 'number') return it.cosmicIcon;
+    return (y * 31 + (m + 1) * 13 + d * 7 + state.calSeed) % COSMIC_ICONS.length;
+  };
+
+  function showToast(msg) {
+    const el = document.getElementById('toastBox');
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.remove('opacity-0');
+    el.classList.add('opacity-100');
+    clearTimeout(showToast._timer);
+    showToast._timer = setTimeout(() => {
+      el.classList.remove('opacity-100');
+      el.classList.add('opacity-0');
+    }, 2400);
+  }
+
+  document.getElementById('loginMascot').innerHTML = renderMoodSvg(0);
+
+  // --- ระบบ Login & สร้างรหัสพนักงานเองได้ ---
+  function setAuthMode(mode) {
+    authMode = mode;
+    const tabLogin = document.getElementById('tabAuthLogin');
+    const tabReg = document.getElementById('tabAuthRegister');
+    const btnSub = document.getElementById('btnAuthSubmit');
+
+    if (mode === 'register') {
+      tabReg.className = 'py-2 px-3 rounded-full border-2 border-[#19143c] bg-[#c9f7e2] text-[#19143c] font-bold text-xs cursor-pointer shadow-[0_3px_0_#2d2666]';
+      tabLogin.className = 'py-2 px-3 rounded-full border-2 border-white/25 bg-white/10 text-white font-bold text-xs cursor-pointer';
+      btnSub.textContent = '✨ สร้างรหัสและเข้าใช้งาน';
+      btnSub.className = 'comic-btn w-full py-3 bg-[#c9f7e2] text-[#19143c] text-sm';
+    } else {
+      tabLogin.className = 'py-2 px-3 rounded-full border-2 border-[#19143c] bg-[#ffb98a] text-[#19143c] font-bold text-xs cursor-pointer shadow-[0_3px_0_#2d2666]';
+      tabReg.className = 'py-2 px-3 rounded-full border-2 border-white/25 bg-white/10 text-white font-bold text-xs cursor-pointer';
+      btnSub.textContent = 'เข้าใช้งานระบบ';
+      btnSub.className = 'comic-btn w-full py-3 bg-[#ffb98a] text-[#19143c] text-sm';
+    }
+    onAuthEmpIdChange();
+  }
+
+  function onAuthEmpIdChange() {
+    const empVal = (document.getElementById('inpEmpId').value || '').trim().toUpperCase();
+    const nameWrap = document.getElementById('employeeNameFields');
+    const smHint = document.getElementById('smBadgeHint');
+    const lblPass = document.getElementById('lblPassword');
+    const helperTxt = document.getElementById('authHelperText');
+
+    if (empVal === APPROVER_ID) {
+      nameWrap.classList.add('hidden');
+      smHint.classList.remove('hidden');
+      lblPass.textContent = 'รหัสผ่านผู้อนุมัติ (SM2080797)';
+      helperTxt.innerHTML = `* ผู้อนุมัติหลัก <b>${APPROVER_NAME.firstName} ${APPROVER_NAME.lastName}</b> กรอกรหัสผ่านเพื่อเข้าใช้งาน`;
+    } else if (authMode === 'register') {
+      smHint.classList.add('hidden');
+      nameWrap.classList.remove('hidden');
+      lblPass.textContent = 'ตั้งรหัสผ่านใหม่ (Password)';
+      helperTxt.innerHTML = '* กรอกรหัสพนักงาน ชื่อ-นามสกุล และตั้งรหัสผ่าน เพื่อใช้แสดงในโปรไฟล์และตอนส่งคำขอ';
+    } else {
+      // โหมดเข้าสู่ระบบ: ซ่อนช่องชื่อ-นามสกุลเสมอ (กรอกแค่รหัสพนักงาน + รหัสผ่าน)
+      smHint.classList.add('hidden');
+      nameWrap.classList.add('hidden');
+      lblPass.textContent = 'รหัสผ่านพนักงาน (Password)';
+      const existingAcc = registeredAccounts[empVal];
+      helperTxt.innerHTML = existingAcc
+        ? `✓ พบบัญชีพนักงาน: <b class="text-[#c9f7e2]">${existingAcc.firstName} ${existingAcc.lastName}</b> (กรอกรหัสผ่านเพื่อเข้าใช้งาน)`
+        : '* เข้าสู่ระบบด้วย <b>รหัสพนักงาน</b> และ <b>รหัสผ่าน</b> ได้ทันที (ไม่ต้องใส่ชื่อ-นามสกุล ระบบจะดึงชื่อแสดงในโปรไฟล์และคำขอให้อัตโนมัติ)';
+    }
+  }
+
+  function openLoginScreen() {
+    setAuthMode('login');
+    document.getElementById('inpFirst').value = state.user?.firstName || '';
+    document.getElementById('inpLast').value = state.user?.lastName || '';
+    document.getElementById('inpEmpId').value = state.user?.empId || '';
+    document.getElementById('inpPassword').value = isManager() ? APPROVER_PASS : (registeredAccounts[state.user?.empId]?.password || '');
+    onAuthEmpIdChange();
+    document.getElementById('loginScreen').classList.remove('hidden');
+  }
+
+  function quickSwitch(asSM) {
+    if (asSM) {
+      state.user = {
+        firstName: APPROVER_NAME.firstName,
+        lastName: APPROVER_NAME.lastName,
+        empId: APPROVER_ID
+      };
+      state.activeTab = 'app';
+      showToast(`สลับเป็นผู้อนุมัติ ${APPROVER_NAME.firstName} (${APPROVER_ID})`);
+    } else {
+      const firstEmp = Object.values(registeredAccounts)[0];
+      if (!firstEmp) {
+        openLoginScreen();
+        setAuthMode('register');
+        return;
+      }
+      state.user = {
+        firstName: firstEmp.firstName,
+        lastName: firstEmp.lastName,
+        empId: firstEmp.empId
+      };
+      state.activeTab = 'cal';
+      showToast(`สลับเป็นพนักงาน ${firstEmp.firstName} (${firstEmp.empId})`);
+    }
+    document.getElementById('loginScreen').classList.add('hidden');
+    closeDaySheet();
+    closeApprovalDetail();
+    renderApp();
+  }
+
+  function fillDemoLogin(asSM) {
+    setAuthMode('login');
+    if (asSM) {
+      document.getElementById('inpEmpId').value = APPROVER_ID;
+      onAuthEmpIdChange();
+      document.getElementById('inpPassword').value = APPROVER_PASS;
+    } else {
+      document.getElementById('inpEmpId').value = '';
+      onAuthEmpIdChange();
+      document.getElementById('inpPassword').value = '';
+    }
+  }
+
+  function handleLogin() {
+    const empId = document.getElementById('inpEmpId').value.trim().toUpperCase();
+    const password = document.getElementById('inpPassword').value;
+
+    if (!empId) {
+      showToast('กรุณากรอกรหัสพนักงานหรือรหัสผู้อนุมัติ');
+      return;
+    }
+
+    // กรณีผู้อนุมัติ SM2080797 (ไม่ต้องใส่ชื่อ ใช้รหัสผ่านอย่างเดียว)
+    if (empId === APPROVER_ID) {
+      if (password !== APPROVER_PASS) {
+        showToast('รหัสผ่านสำหรับ SM2080797 ไม่ถูกต้อง');
+        return;
+      }
+      state.user = {
+        firstName: APPROVER_NAME.firstName,
+        lastName: APPROVER_NAME.lastName,
+        empId: APPROVER_ID
+      };
+      state.activeTab = 'app';
+      document.getElementById('loginScreen').classList.add('hidden');
+      showToast(`ยินดีต้อนรับ ${APPROVER_NAME.firstName} ${APPROVER_NAME.lastName} (${APPROVER_ID})`);
+      renderApp();
+      return;
+    }
+
+    // กรณีพนักงานสร้างรหัสเองใหม่
+    if (authMode === 'register') {
+      const firstName = document.getElementById('inpFirst').value.trim();
+      const lastName = document.getElementById('inpLast').value.trim();
+      if (!firstName || !lastName || !password) {
+        showToast('กรุณากรอกรหัสพนักงาน ชื่อ นามสกุล และตั้ง Password ให้ครบ');
+        return;
+      }
+      if (registeredAccounts[empId]) {
+        showToast(`รหัส ${empId} มีในระบบแล้ว กรุณาใช้รหัสอื่นหรือกดเข้าสู่ระบบ`);
+        return;
+      }
+      registeredAccounts[empId] = { firstName, lastName, empId, password };
+      window.cloudStore?.saveAccount(registeredAccounts[empId]);
+      state.user = { firstName, lastName, empId };
+      rebuildVisibleCalendarItems();
+      state.activeTab = 'cal';
+      document.getElementById('loginScreen').classList.add('hidden');
+      showToast(`สร้างรหัส ${empId} (${firstName} ${lastName}) และบันทึกลงฐานข้อมูลแล้ว ✓`);
+      renderApp();
+      return;
+    }
+
+    // กรณีพนักงานเข้าสู่ระบบด้วยรหัสที่มีอยู่หรือกรอกข้อมูล
+    const existing = registeredAccounts[empId];
+    if (existing) {
+      if (password !== existing.password) {
+        showToast(`รหัสผ่านของ ${empId} ไม่ถูกต้อง`);
+        return;
+      }
+      state.user = { firstName: existing.firstName, lastName: existing.lastName, empId, avatar: existing.avatar || '' };
+      rebuildVisibleCalendarItems();
+    } else {
+      const firstName = document.getElementById('inpFirst').value.trim();
+      const lastName = document.getElementById('inpLast').value.trim();
+      if (!firstName || !lastName || !password) {
+        showToast('ไม่พบรหัสนี้ในฐานข้อมูล กรุณากด "✨ สร้างรหัสพนักงาน" เพื่อลงทะเบียน');
+        return;
+      }
+      registeredAccounts[empId] = { firstName, lastName, empId, password };
+      window.cloudStore?.saveAccount(registeredAccounts[empId]);
+      state.user = { firstName, lastName, empId };
+      rebuildVisibleCalendarItems();
+    }
+
+    state.activeTab = 'cal';
+    document.getElementById('loginScreen').classList.add('hidden');
+    showToast(`ยินดีต้อนรับ ${state.user.firstName} (${empId})`);
+    renderApp();
+  }
+
+  // --- คำนวณ OT (ชั่วโมงสุทธิ) และตรวจวันลาทับซ้อน ---
+  function calcOTHours(timeIn, timeOut) {
+    if (!isValid24hTime(timeIn) || !isValid24hTime(timeOut)) return 0;
+    const [h1, m1] = timeIn.split(':').map(Number);
+    const [h2, m2] = timeOut.split(':').map(Number);
+    let diffMins = (h2 * 60 + m2) - (h1 * 60 + m1);
+    if (diffMins <= 0) diffMins += 1440;
+    const otHours = (diffMins / 60) - 9; // หักเวลาทำงาน 8 ชม. + พัก 1 ชม.
+    return Math.max(0, Math.round(otHours * 10) / 10);
+  }
+
+  function findLeaveOverlap(fromStr, toStr) {
+    if (!fromStr || !toStr) return null;
+    const f1 = parseDate(fromStr).getTime();
+    const t1 = parseDate(toStr).getTime();
+    const currentEmpId = (state.user?.empId || '').trim().toUpperCase();
+
+    for (const req of state.teamRequests) {
+      if (req.type !== 'leave' || req.status === 'rejected') continue;
+      if ((req.empId || '').trim().toUpperCase() === currentEmpId) continue;
+      const f2 = parseDate(req.from).getTime();
+      const t2 = parseDate(req.to || req.from).getTime();
+      if (f1 <= t2 && t1 >= f2) {
+        return req;
+      }
+    }
+    return null;
+  }
+
+  function onManualTimeInput(inputEl) {
+    let raw = inputEl.value.replace(/[^\d:]/g, '');
+    if (!raw.includes(':') && raw.length >= 3) {
+      raw = raw.slice(0, 2) + ':' + raw.slice(2, 4);
+    }
+    inputEl.value = raw.slice(0, 5);
+    validateForm();
+  }
+
+  function getUserAvatarSrc(userObj = state.user) {
+    if (!userObj) return '';
+    if (userObj.avatar) return userObj.avatar;
+    const acc = registeredAccounts[(userObj.empId || '').trim().toUpperCase()];
+    return acc?.avatar || '';
+  }
+
+  function renderUserAvatarHtml(moodIdx = 0, sizeClass = 'w-12 h-12', userObj = state.user) {
+    const avatarSrc = getUserAvatarSrc(userObj);
+    if (avatarSrc) {
+      return `<img src="${avatarSrc}" alt="รูปโปรไฟล์" class="${sizeClass} rounded-full object-cover border-2.5 border-[#19143c] bg-white">`;
+    }
+    return `<div class="${sizeClass} rounded-full border-2.5 border-[#19143c] bg-gradient-to-br from-[#ffb98a] to-[#ffb6d5] p-0.5 flex items-center justify-center">${renderMoodSvg(moodIdx)}</div>`;
+  }
+
+  // --- การแสดงผลหน้าจอหลัก ---
+  function renderApp() {
+    const manager = isManager();
+    const pendingCount = state.teamRequests.filter(r => r.status === 'submitted').length;
+
+    const headerTitles = {
+      cal: ['ปฏิทินโอที & ลาพักร้อน', manager ? `โหมดผู้อนุมัติ (${APPROVER_ID}) · ดูภาพรวมอย่างเดียว (ไม่สามารถแก้ไขเวลาได้)` : `ส่งอนุมัติไปที่รหัส ${APPROVER_ID} เท่านั้น`],
+      sum: ['สรุปชั่วโมงโอที & วันลา', manager ? `สรุปรายการคำขอทั้งหมดในระบบ (สิทธิ์ดูอย่างเดียว)` : 'ภาพรวมการทำงานและสถานะคำขอ'],
+      app: [`อนุมัติคำขอ (${APPROVER_ID})`, 'ตรวจสอบและอนุมัติคำขอ (ไม่สามารถแก้ไขเวลาของพนักงานได้)'],
+      me: ['โปรไฟล์ผู้ใช้งาน', 'ข้อมูลผู้ใช้งานและรายการวันลาในทีม']
+    };
+    const [hTitle, hSub] = headerTitles[state.activeTab] || headerTitles.cal;
+
+    document.getElementById('appHeader').innerHTML = `
+      <div class="bg-white text-[#19143c] px-4 pt-3.5 pb-4 relative z-10">
+        <div class="w-12 h-12 absolute right-3.5 top-2.5">
+          ${renderUserAvatarHtml(state.activeTab === 'app' ? 2 : 0, 'w-12 h-12')}
+        </div>
+        <div class="flex items-center gap-2 font-bold text-2xl tracking-tight">
+          <span>oto</span>
+          <span class="text-[11px] bg-[#ffe8d6] text-[#19143c] border-2 border-[#19143c] px-2.5 py-0.5 rounded-full font-bold">
+            ${manager ? `ผู้อนุมัติ · ${APPROVER_ID}` : `พนักงาน · ${state.user.empId}`}
+          </span>
+        </div>
+        <h1 class="text-lg font-bold mt-1 leading-snug">${hTitle}</h1>
+        <p class="text-xs text-[#7a76a3]">${hSub}</p>
+        <div class="mt-1.5 inline-flex items-center gap-1.5 bg-[#f3f0ff] border border-[#19143c] rounded-full px-2.5 py-0.5 text-[11px] font-bold text-[#19143c]">
+          <span>🇹🇭 เวลาไทย (UTC+7):</span>
+          <span id="liveBkkClock" class="text-[#4b29f2]">${getBangkokLiveClock()}</span>
+        </div>
+        <svg class="absolute left-0 top-full w-full h-7 fill-white block" viewBox="0 0 400 40" preserveAspectRatio="none">
+          <path d="M0 0H400V10C380 10 378 34 354 34S328 12 300 12 270 28 246 28 222 8 196 8 170 30 144 30 118 10 92 10 66 32 42 32 18 12 0 12Z"/>
+        </svg>
+      </div>`;
+
+    const mainEl = document.getElementById('appMain');
+    if (state.activeTab === 'cal') renderCalendarTab(mainEl);
+    else if (state.activeTab === 'sum') renderSummaryTab(mainEl);
+    else if (state.activeTab === 'app') renderApprovalTab(mainEl);
+    else renderProfileTab(mainEl);
+
+    document.getElementById('appNav').innerHTML = `
+      <div class="bg-white border-2.5 border-[#19143c] shadow-[0_4px_0_#2d2666] rounded-3xl flex h-16 items-end px-1 pb-1.5">
+        <button onclick="switchTab('cal')" class="nav-item ${state.activeTab === 'cal' ? 'active text-[#19143c] font-bold' : 'text-[#6c688f]'} flex-1 flex flex-col items-center justify-end h-full gap-0.5 text-[11px] cursor-pointer">
+          <span class="nav-bubble w-6 h-6 flex items-center justify-center transition-all text-base">📅</span>
+          <span>ปฏิทิน</span>
+        </button>
+        <button onclick="switchTab('sum')" class="nav-item ${state.activeTab === 'sum' ? 'active text-[#19143c] font-bold' : 'text-[#6c688f]'} flex-1 flex flex-col items-center justify-end h-full gap-0.5 text-[11px] cursor-pointer">
+          <span class="nav-bubble w-6 h-6 flex items-center justify-center transition-all text-base">📊</span>
+          <span>สรุป</span>
+        </button>
+        ${manager ? `
+        <button onclick="switchTab('app')" class="nav-item ${state.activeTab === 'app' ? 'active text-[#19143c] font-bold' : 'text-[#6c688f]'} flex-1 flex flex-col items-center justify-end h-full gap-0.5 text-[11px] cursor-pointer">
+          <span class="nav-bubble w-6 h-6 flex items-center justify-center transition-all text-base">✅</span>
+          <span>อนุมัติ${pendingCount ? ` (${pendingCount})` : ''}</span>
+        </button>` : ''}
+        <button onclick="switchTab('me')" class="nav-item ${state.activeTab === 'me' ? 'active text-[#19143c] font-bold' : 'text-[#6c688f]'} flex-1 flex flex-col items-center justify-end h-full gap-0.5 text-[11px] cursor-pointer">
+          <span class="nav-bubble w-6 h-6 flex items-center justify-center transition-all text-base">🙂</span>
+          <span>โปรไฟล์</span>
+        </button>
+      </div>`;
+  }
+
+  function switchTab(tab) {
+    state.activeTab = tab;
+    renderApp();
+  }
+
+  function setApprovalSubTab(subTab) {
+    state.approvalSubTab = subTab;
+    expandedHistoryId = null;
+    renderApp();
+  }
+
+  function toggleHistoryItem(reqId) {
+    expandedHistoryId = expandedHistoryId === reqId ? null : reqId;
+    renderApp();
+  }
+
+  function stepCarousel(delta) {
+    const pendingList = state.teamRequests.filter(
+      r => (r.approverId || APPROVER_ID) === APPROVER_ID && r.status === 'submitted'
+    );
+    if (!pendingList.length) return;
+    state.carouselIndex = Math.max(0, Math.min(pendingList.length - 1, state.carouselIndex + delta));
+    renderApp();
+  }
+
+  function jumpCarousel(index) {
+    const pendingList = state.teamRequests.filter(
+      r => (r.approverId || APPROVER_ID) === APPROVER_ID && r.status === 'submitted'
+    );
+    if (!pendingList.length) return;
+    state.carouselIndex = Math.max(0, Math.min(pendingList.length - 1, Number(index)));
+    renderApp();
+  }
+
+  function shuffleCalendarIcons() {
+    state.calSeed = Math.floor(Math.random() * 999);
+    Object.values(state.items).forEach(it => {
+      it.cosmicIcon = getRandomCosmicIndex();
+    });
+    renderApp();
+    showToast('สุ่มไอคอนปฏิทินชุดใหม่แล้ว ✨');
+  }
+
+  function changeMonth(delta) {
+    state.month += delta;
+    if (state.month < 0) { state.month = 11; state.year--; }
+    if (state.month > 11) { state.month = 0; state.year++; }
+    renderApp();
+  }
+
+  function renderCalendarTab(container) {
+    const y = state.year, m = state.month;
+    const firstDay = new Date(y, m, 1).getDay();
+    const totalDays = new Date(y, m + 1, 0).getDate();
+    const prevDays = new Date(y, m, 0).getDate();
+
+    let gridHtml = TH_DAYS.map(d => `<div class="text-[11px] font-bold text-[#7a76a3] text-center">${d}</div>`).join('');
+
+    for (let i = firstDay - 1; i >= 0; i--) {
+      gridHtml += `<div class="cal-cell is-faded"><b class="text-[11px]">${prevDays - i}</b><span></span><span></span></div>`;
+    }
+
+    let monthOtHours = 0;
+    let monthLeaveDays = 0;
+
+    // รวบรวมวันลาพักร้อนทั้งหมด (ทั้งของตัวเองที่บันทึกไว้และคำขอลาพักร้อนของทุกคนที่ไม่ถูกปฏิเสธ)
+    const activeEmpIds = new Set(Object.keys(registeredAccounts).map(k => k.trim().toUpperCase()));
+    const leaveDateMetaMap = new Map();
+    Object.entries(state.items).forEach(([startKey, item]) => {
+      if (!item || item.type !== 'leave') return;
+      const itemEmp = (item.empId || '').trim().toUpperCase();
+      if (itemEmp && itemEmp !== APPROVER_ID && !activeEmpIds.has(itemEmp)) return;
+      const endKey = item.to || startKey;
+      const daysCount = Math.max(1, calcLeaveDays(startKey, endKey));
+      for (let offset = 0; offset < daysCount; offset++) {
+        const ymd = addDaysYMD(startKey, offset);
+        leaveDateMetaMap.set(ymd, {
+          empId: item.empId || state.user?.empId || '',
+          cosmicIcon: item.cosmicIcon,
+          isStart: offset === 0
+        });
+      }
+    });
+
+    state.teamRequests.forEach(req => {
+      if (!req || req.type !== 'leave' || req.status === 'rejected') return;
+      const reqEmp = (req.empId || '').trim().toUpperCase();
+      if (reqEmp && reqEmp !== APPROVER_ID && !activeEmpIds.has(reqEmp)) return;
+      const startKey = req.from;
+      const endKey = req.to || req.from;
+      if (!startKey || !endKey) return;
+      const daysCount = Math.max(1, calcLeaveDays(startKey, endKey));
+      for (let offset = 0; offset < daysCount; offset++) {
+        const ymd = addDaysYMD(startKey, offset);
+        if (!leaveDateMetaMap.has(ymd)) {
+          leaveDateMetaMap.set(ymd, {
+            empId: req.empId || '',
+            cosmicIcon: undefined,
+            isStart: offset === 0
+          });
+        }
+      }
+    });
+
+    for (let d = 1; d <= totalDays; d++) {
+      const k = formatYMD(y, m, d);
+      const it = state.items[k];
+      const leaveInfo = leaveDateMetaMap.get(k);
+      const isLeaveDay = Boolean((it && it.type === 'leave') || leaveInfo);
+      const hrs = it && it.type === 'ot' ? calcOTHours(it.timeIn, it.timeOut) : 0;
+      if (it && it.type === 'ot') monthOtHours += hrs;
+      if (isLeaveDay) monthLeaveDays++;
+
+      const classes = ['cal-cell'];
+      if (it && it.type === 'ot') classes.push('is-ot');
+      if (isLeaveDay) classes.push('is-leave');
+      if (k === TODAY) classes.push('is-today');
+
+      const cosmicIdx = getCellCosmicIndex(y, m, d, it || (leaveInfo ? { cosmicIcon: leaveInfo.cosmicIcon } : null));
+      const hasVisualBadge = Boolean(it || isLeaveDay);
+
+      gridHtml += `
+        <button onclick="openDaySheet('${k}')" class="${classes.join(' ')}">
+          <b class="text-[11px] font-bold leading-none">${d}</b>
+          ${hasVisualBadge ? `
+            <span class="w-6 h-6 flex items-center justify-center rounded-md overflow-hidden shadow-xs">
+              ${renderCosmicSvg(cosmicIdx)}
+            </span>
+            ${it && it.type === 'ot'
+              ? `<span class="text-[9px] font-bold bg-white text-[#19143c] border border-[#19143c] rounded-md px-1 leading-tight">+${hrs}ชม.</span>`
+              : `<span class="text-[9px] font-bold bg-[#065f46] text-white border border-white/80 rounded-md px-1 leading-tight">ลาพักร้อน</span>`}
+          ` : `
+            <span class="w-6 h-6"></span>
+            <span class="text-[9px] opacity-0">-</span>
+          `}
+        </button>`;
+    }
+
+    const rem = (7 - ((firstDay + totalDays) % 7)) % 7;
+    for (let i = 1; i <= rem; i++) {
+      gridHtml += `<div class="cal-cell is-faded"><b class="text-[11px]">${i}</b><span></span><span></span></div>`;
+    }
+
+    const managerMode = isManager();
+
+    container.innerHTML = `
+      <div class="comic-card p-3.5 mb-3">
+        <div class="flex items-center justify-between gap-2 mb-2.5">
+          <h3 class="text-base font-bold">${TH_MONTHS[m]} ${y + 543}</h3>
+          <div class="flex items-center gap-1.5">
+            <button onclick="shuffleCalendarIcons()" title="สุ่มไอคอนใหม่" class="px-2.5 h-8 rounded-full border-2 border-[#19143c] bg-[#f3f0ff] hover:bg-[#ffe8d6] font-bold text-[11px] cursor-pointer">🎲 สุ่มไอคอน</button>
+            <button onclick="changeMonth(-1)" class="w-8 h-8 rounded-full border-2 border-[#19143c] bg-white font-bold text-base flex items-center justify-center cursor-pointer">‹</button>
+            <button onclick="changeMonth(1)" class="w-8 h-8 rounded-full border-2 border-[#19143c] bg-white font-bold text-base flex items-center justify-center cursor-pointer">›</button>
+          </div>
+        </div>
+        <div class="grid grid-cols-7 gap-1.5">${gridHtml}</div>
+        <div class="flex items-center justify-between text-xs mt-3 pt-2.5 border-t-2 border-dashed border-[#ded8ff]">
+          <span>⚡ OT รวม: <b>${Math.round(monthOtHours * 10) / 10} ชม.</b></span>
+          <span>🌴 ลาพักร้อน: <b>${monthLeaveDays} วัน</b></span>
+          ${managerMode
+            ? `<span class="px-2.5 py-0.5 rounded-full border border-[#19143c] bg-[#ffe8d6] font-bold text-[10px] text-[#19143c]">🔒 SM ดูอย่างเดียว</span>`
+            : `<button onclick="openDaySheet('${TODAY}')" class="px-2.5 py-0.5 rounded-full border border-[#19143c] bg-[#ece8ff] font-bold text-[11px] cursor-pointer">วันนี้</button>`}
+        </div>
+      </div>
+      ${managerMode ? `
+        <div class="comic-card p-3 text-center bg-[#f3f0ff] text-xs font-semibold text-[#19143c]">
+          🛡️ สิทธิ์ผู้อนุมัติ <b>${APPROVER_ID}</b> ไม่สามารถบันทึกหรือแก้ไขเวลาของใครได้ · ไปที่แท็บ <b>อนุมัติ</b> เพื่อตรวจสอบคำขอ
+        </div>
+      ` : `
+        <div class="space-y-2">
+          <button onclick="openDaySheet('${TODAY}')" class="comic-btn w-full py-3 bg-[#4b29f2] text-white text-sm">
+            + บันทึกวันนี้ (${formatThaiShort(TODAY)})
+          </button>
+          <button onclick="openEmployeeLeaveCreator('${TODAY}')" class="comic-btn w-full py-2.5 bg-[#c9f7e2] text-[#19143c] text-xs">
+            🌴 สร้างวันลาพักร้อนของฉัน (สูงสุด 5 วัน)
+          </button>
+        </div>
+      `}`;
+  }
+
+  function openEmployeeLeaveCreator(dateKey) {
+    if (isManager()) {
+      showToast(`สิทธิ์ผู้อนุมัติ ${APPROVER_ID} ไม่สามารถบันทึกหรือแก้ไขเวลาของใครได้`);
+      return;
+    }
+    openDaySheet(dateKey || TODAY);
+    setEntryMode('leave');
+    showToast('เปิดหน้าสร้างวันลาพักร้อนของโปรไฟล์คุณแล้ว เลือกวันที่ได้เลยครับ');
+  }
+
+  function syncLeaveProfileOwnerDisplay() {
+    const ownerEl = document.getElementById('leaveOwnerNameText');
+    if (!ownerEl) return;
+    const u = state.user || { firstName: 'พนักงาน', lastName: '', empId: 'EMP-0231' };
+    ownerEl.textContent = `${u.firstName} ${u.lastName} (${u.empId})`;
+  }
+
+  function renderSummaryTab(container) {
+    const managerMode = isManager();
+
+    // โหมดผู้อนุมัติ SM2080797: แสดงกราฟการทำ OT ของทุกคนในระบบ (วงแหวนรวม + กราฟเส้นคลื่น + แท่งแยกตามรายบุคคล)
+    if (managerMode) {
+      const otReqs = state.teamRequests.filter(r => r.type === 'ot' && r.status !== 'rejected');
+      const totalTeamOtHours = Math.round(otReqs.reduce((sum, r) => sum + (Number(r.hours) || calcOTHours(r.timeIn, r.timeOut) || 0), 0) * 10) / 10;
+      const totalTeamLeaveDays = state.teamRequests.filter(r => r.type === 'leave' && r.status !== 'rejected').length;
+
+      // รวมชั่วโมง OT แยกตามพนักงานแต่ละคน
+      const byPersonMap = new Map();
+      otReqs.forEach(r => {
+        const key = r.empId;
+        const hrs = Number(r.hours) || calcOTHours(r.timeIn, r.timeOut) || 0;
+        const prev = byPersonMap.get(key) || {
+          empId: r.empId,
+          fullName: `${r.firstName} ${r.lastName}`,
+          hours: 0,
+          count: 0,
+          mood: r.mood ?? 2
+        };
+        prev.hours = Math.round((prev.hours + hrs) * 10) / 10;
+        prev.count += 1;
+        byPersonMap.set(key, prev);
+      });
+      const personStats = Array.from(byPersonMap.values()).sort((a, b) => b.hours - a.hours);
+      const maxPersonHours = Math.max(4, ...personStats.map(p => p.hours));
+
+      // รวมชั่วโมง OT รายวันสำหรับกราฟเส้นคลื่น (เรียงตามวันที่)
+      const byDateMap = new Map();
+      otReqs.forEach(r => {
+        const dKey = r.from || TODAY;
+        const hrs = Number(r.hours) || calcOTHours(r.timeIn, r.timeOut) || 0;
+        byDateMap.set(dKey, Math.round(((byDateMap.get(dKey) || 0) + hrs) * 10) / 10);
+      });
+      const sortedDates = Array.from(byDateMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+      const wavePoints = sortedDates.length ? sortedDates : [[TODAY, 0]];
+      const maxWaveVal = Math.max(2, ...wavePoints.map(([, v]) => v));
+
+      // คำนวณความคืบหน้าวงแหวน (เทียบเป้าทีม 30 ชม.)
+      const targetHours = 30;
+      const pct = Math.min(100, Math.round((totalTeamOtHours / targetHours) * 100));
+      const radius = 44;
+      const circumference = 2 * Math.PI * radius;
+      const dashOffset = circumference - (pct / 100) * circumference;
+
+      // สร้างพิกัดกราฟเส้น SVG
+      const svgW = 300;
+      const svgH = 92;
+      const padX = 16;
+      const padY = 16;
+      const coords = wavePoints.map(([, val], idx) => {
+        const x = wavePoints.length === 1
+          ? svgW / 2
+          : padX + (idx / (wavePoints.length - 1)) * (svgW - padX * 2);
+        const y = svgH - padY - ((val / maxWaveVal) * (svgH - padY * 2));
+        return { x, y, val };
+      });
+      const linePath = coords.map((pt, i) => `${i === 0 ? 'M' : 'L'} ${pt.x.toFixed(1)} ${pt.y.toFixed(1)}`).join(' ');
+      const areaPath = coords.length
+        ? `${linePath} L ${coords[coords.length - 1].x.toFixed(1)} ${svgH - 8} L ${coords[0].x.toFixed(1)} ${svgH - 8} Z`
+        : '';
+
+      container.innerHTML = `
+        <!-- การ์ดวงแหวนรวม + สรุปของทุกคน (สไตล์ Pulse Dashboard) -->
+        <div class="bg-[#120e2e] text-white border-2.5 border-[#2d2666] rounded-3xl p-3.5 mb-3 shadow-[0_5px_0_#0b081f]">
+          <div class="flex items-center justify-between gap-2 mb-2.5">
+            <div>
+              <span class="text-[10px] font-bold uppercase tracking-wider text-[#ff9955]">TEAM OT ANALYTICS · ${APPROVER_ID}</span>
+              <h3 class="text-base font-bold text-white">กราฟการทำ OT ของทุกคน</h3>
+            </div>
+            <div class="flex items-center gap-1.5 flex-none">
+              <button type="button" onclick="downloadTeamOtExcel()" class="px-2.5 py-1 rounded-full border border-[#36c78c] bg-[#36c78c]/20 hover:bg-[#36c78c]/35 text-[#7be0b5] text-[10px] font-bold cursor-pointer">
+                📥 โหลด Excel
+              </button>
+              <span class="px-2.5 py-0.5 rounded-full bg-[#ff9955]/20 border border-[#ff9955] text-[#ffb98a] text-[10px] font-bold">
+                🔒 ดูอย่างเดียว
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- กราฟเส้นแสดงแนวโน้มชั่วโมง OT รายวันของทีม -->
+        <div class="bg-[#120e2e] text-white border-2.5 border-[#2d2666] rounded-3xl p-3.5 mb-3 shadow-[0_5px_0_#0b081f]">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-xs font-bold text-white">📈 แนวโน้ม OT รายวันของทุกคน</span>
+            <span class="px-2 py-0.5 rounded-full bg-[#ff5c72]/20 text-[#ff9aa7] text-[10px] font-bold">สูงสุด ${maxWaveVal} ชม.</span>
+          </div>
+          <svg viewBox="0 0 ${svgW} ${svgH}" class="w-full h-24 overflow-visible">
+            <defs>
+              <linearGradient id="otWaveFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#ff5c72" stop-opacity="0.45"/>
+                <stop offset="100%" stop-color="#ff5c72" stop-opacity="0.0"/>
+              </linearGradient>
+            </defs>
+            ${areaPath ? `<path d="${areaPath}" fill="url(#otWaveFill)"/>` : ''}
+            ${linePath ? `<path d="${linePath}" fill="none" stroke="#ff7a8a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>` : ''}
+            ${coords.map(pt => `
+              <circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="4.5" fill="#ffb98a" stroke="#19143c" stroke-width="2"/>
+              <text x="${pt.x.toFixed(1)}" y="${Math.max(10, pt.y - 8).toFixed(1)}" text-anchor="middle" fill="#ffffff" font-size="9" font-weight="bold">${pt.val}ชม.</text>
+            `).join('')}
+          </svg>
+          <div class="flex justify-between text-[10px] text-[#9d98c9] mt-1 px-1">
+            ${wavePoints.map(([dStr]) => `<span>${formatThaiShort(dStr).split(' ').slice(0, 2).join(' ')}</span>`).join('')}
+          </div>
+        </div>
+
+        <!-- กราฟแท่งเปรียบเทียบชั่วโมง OT ของพนักงานแต่ละคน -->
+        <div class="comic-card p-3.5">
+          <div class="flex items-center justify-between mb-2.5">
+            <h3 class="text-sm font-bold text-[#19143c]">📊 ชั่วโมง OT แยกตามรายบุคคล</h3>
+            <button type="button" onclick="downloadTeamOtExcel()" class="px-2.5 py-1 rounded-full border border-[#19143c] bg-[#c9f7e2] hover:bg-[#36c78c] text-[10px] font-bold text-[#19143c] cursor-pointer">
+              📥 ดาวน์โหลด Excel
+            </button>
+          </div>
+          <div class="space-y-2.5">
+            ${personStats.length ? personStats.map(p => {
+              const barPct = Math.max(8, Math.round((p.hours / maxPersonHours) * 100));
+              return `
+                <div class="bg-[#f7f5ff] border-2 border-[#19143c] rounded-2xl p-2.5">
+                  <div class="flex items-center justify-between text-xs font-bold text-[#19143c] mb-1">
+                    <span class="truncate">${p.fullName} <span class="text-[#7a76a3]">(${p.empId})</span></span>
+                    <span class="text-[#4b29f2] flex-none ml-2">+${p.hours} ชม. (${p.count} ครั้ง)</span>
+                  </div>
+                  <div class="w-full h-3 rounded-full bg-white border border-[#19143c] overflow-hidden">
+                    <div class="h-full bg-gradient-to-r from-[#ffb98a] to-[#4b29f2] rounded-full" style="width:${barPct}%"></div>
+                  </div>
+                </div>
+              `;
+            }).join('') : `<p class="text-xs text-[#7a76a3] text-center py-4">ยังไม่มีรายการทำ OT ของพนักงานในระบบ</p>`}
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    const myEntries = Object.values(state.items);
+    const totalOtHours = Math.round(myEntries.filter(i => i.type === 'ot').reduce((s, i) => s + calcOTHours(i.timeIn, i.timeOut), 0) * 10) / 10;
+    const totalLeaveDays = myEntries.filter(i => i.type === 'leave').length;
+    const pendingReqs = state.teamRequests.filter(r => r.status === 'submitted').length;
+    const approvedReqs = state.teamRequests.filter(r => r.status === 'approved').length;
+
+    container.innerHTML = `
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <div class="comic-card p-3.5 text-center bg-gradient-to-b from-[#fff5eb] to-white">
+          <div class="text-2xl font-extrabold text-[#4b29f2]">+${totalOtHours} ชม.</div>
+          <div class="text-xs text-[#7a76a3] font-semibold mt-0.5">ชั่วโมง OT สุทธิ</div>
+        </div>
+        <div class="comic-card p-3.5 text-center bg-gradient-to-b from-[#effcf6] to-white">
+          <div class="text-2xl font-extrabold text-[#117a50]">${totalLeaveDays} วัน</div>
+          <div class="text-xs text-[#7a76a3] font-semibold mt-0.5">วันลาพักร้อน</div>
+        </div>
+        <div class="comic-card p-3.5 text-center">
+          <div class="text-2xl font-extrabold text-[#14468c]">${pendingReqs}</div>
+          <div class="text-xs text-[#7a76a3] font-semibold mt-0.5">รออนุมัติที่ ${APPROVER_ID}</div>
+        </div>
+        <div class="comic-card p-3.5 text-center">
+          <div class="text-2xl font-extrabold text-[#19143c]">${approvedReqs}</div>
+          <div class="text-xs text-[#7a76a3] font-semibold mt-0.5">อนุมัติแล้ว</div>
+        </div>
+      </div>
+      <div class="comic-card p-3.5 text-xs text-[#7a76a3] leading-relaxed">
+        <b class="text-[#19143c]">เกณฑ์การคำนวณ:</b> เวลาทำงานจริงหักเวลาทำงานปกติ 8 ชม. และเวลาพัก 1 ชม. · ลาพักร้อนต่อเนื่องได้สูงสุด <b>${MAX_CONSECUTIVE_LEAVE_DAYS} วัน</b> และห้ามลาทับซ้อนกับพนักงานคนอื่น · ส่งอนุมัติที่ <b>${APPROVER_ID}</b> เท่านั้น
+      </div>
+    `;
+  }
+
+  function renderApprovalTab(container) {
+    if (!isManager()) {
+      container.innerHTML = `
+        <div class="comic-card p-5 text-center">
+          <div class="text-base font-bold mb-1">สำหรับผู้อนุมัติ (${APPROVER_ID}) เท่านั้น</div>
+          <p class="text-xs text-[#7a76a3]">คุณกำลังใช้งานในโหมดพนักงาน (${state.user.empId})</p>
+        </div>`;
+      return;
+    }
+
+    const pendingList = state.teamRequests.filter(
+      r => (r.approverId || APPROVER_ID) === APPROVER_ID && r.status === 'submitted'
+    );
+    const historyList = state.teamRequests.filter(
+      r => (r.approverId || APPROVER_ID) === APPROVER_ID && r.status !== 'submitted'
+    );
+
+    if (state.carouselIndex >= pendingList.length) {
+      state.carouselIndex = Math.max(0, pendingList.length - 1);
+    }
+
+    const activeReq = pendingList[state.carouselIndex] || null;
+    const activeReqId = activeReq ? activeReq.id : '';
+
+    const buildCardHtml = (req, roleClass, baseTransform, isCenter) => {
+      const isOT = req.type === 'ot';
+      const bgStyle = isOT
+        ? 'background: linear-gradient(150deg, #ff9d5c, #ff6a3d); color: #ffffff;'
+        : 'background: linear-gradient(150deg, #52b788, #2d6a4f); color: #ffffff;';
+      const dateLabel = isOT
+        ? `${formatThaiShort(req.from)} (${req.timeIn || '09:00'}–${req.timeOut || '20:00'})`
+        : `${formatThaiShort(req.from)} – ${formatThaiShort(req.to || req.from)}`;
+      const thumbSrc = isOT ? (req.photo || '') : '';
+
+      return `
+        <div ${isCenter ? 'id="activeCenterCard"' : `onclick="jumpCarousel(${req._idx})"`}
+             class="req-card-3d ${roleClass}"
+             style="${bgStyle} transform: ${baseTransform};">
+          <div class="flex items-center justify-between gap-1 pointer-events-none">
+            <span class="px-2 py-0.5 rounded-full bg-white text-[#19143c] border-2 border-[#19143c] text-[10px] font-extrabold truncate">${req.empId}</span>
+            <span class="px-2 py-0.5 rounded-full bg-[#19143c]/35 text-white border border-white/30 text-[10px] font-bold flex-none">${isOT ? '⚡ ขอ OT' : '🌴 ลาพักร้อน'}</span>
+          </div>
+
+          <div class="text-center pointer-events-none my-auto">
+            <div class="w-10 h-10 mx-auto rounded-full border-2 border-[#19143c] bg-white p-0.5 mb-1 flex items-center justify-center">
+              ${renderMoodSvg(req.mood ?? (isOT ? 2 : 1))}
+            </div>
+            <div class="text-lg font-extrabold leading-tight drop-shadow-xs">
+              ${isOT ? `+${req.hours || 2} ชม.` : `${calcLeaveDays(req.from, req.to || req.from)} วัน`}
+            </div>
+            <div class="text-xs font-bold truncate">${req.firstName} ${req.lastName}</div>
+            <div class="text-[10px] opacity-90 truncate mt-0.5">${dateLabel}</div>
+            ${thumbSrc ? `
+              <div class="mt-1.5 flex items-center justify-center">
+                <img src="${thumbSrc}" alt="รูปเช็คเอาท์" class="w-full h-11 object-cover rounded-xl border-2 border-[#19143c] bg-[#19143c]">
+              </div>
+            ` : ''}
+          </div>
+
+          <div class="bg-white text-[#19143c] border-2 border-[#19143c] rounded-full py-1 px-2 text-center text-[10px] font-extrabold pointer-events-none truncate">
+            ${isCenter ? '👆 แตะ/ปัดขึ้นดู · ปัดลงอนุมัติ' : 'แตะเลือก'}
+          </div>
+        </div>
+      `;
+    };
+
+    const cardsHtml = pendingList.map((req, idx) => {
+      const offset = idx - state.carouselIndex;
+      if (Math.abs(offset) > 2) return '';
+      if (offset === 0) {
+        return buildCardHtml({ ...req, _idx: idx }, 'is-center', 'translateX(0px) translateY(0px) rotate(0deg) scale(1)', true);
+      }
+      const tx = offset * 128;
+      const rot = offset * 8;
+      const sc = offset === -1 || offset === 1 ? 0.84 : 0.72;
+      return buildCardHtml({ ...req, _idx: idx }, 'is-side', `translateX(${tx}px) translateY(8px) rotate(${rot}deg) scale(${sc})`, false);
+    }).join('');
+
+    container.innerHTML = `
+      <div class="grid grid-cols-2 gap-2.5 mb-3">
+        <button type="button" onclick="setApprovalSubTab('pending')"
+                class="py-2.5 px-3 rounded-full border-2.5 border-[#19143c] font-bold text-xs cursor-pointer ${state.approvalSubTab === 'pending' ? 'bg-[#ffb98a] text-[#19143c] shadow-[0_3px_0_#2d2666]' : 'bg-[#251f52] text-white/80'}">
+          ⏳ รออนุมัติ (${pendingList.length})
+        </button>
+        <button type="button" onclick="setApprovalSubTab('history')"
+                class="py-2.5 px-3 rounded-full border-2.5 border-[#19143c] font-bold text-xs cursor-pointer ${state.approvalSubTab === 'history' ? 'bg-[#c9f7e2] text-[#19143c] shadow-[0_3px_0_#2d2666]' : 'bg-[#251f52] text-white/80'}">
+          📜 ประวัติการอนุมัติ (${historyList.length})
+        </button>
+      </div>
+
+      ${state.approvalSubTab === 'pending' ? `
+        ${activeReq ? `
+          <div class="text-center mb-2">
+            <div class="text-[11px] font-bold text-[#ffb98a]">
+              👆 ปัดซ้าย–ขวา เพื่อเลือกคน · ปัดขึ้น/แตะ เพื่อดูรายละเอียด · ปัดลง เพื่ออนุมัติ
+            </div>
+            <div class="text-xs text-[#d6d1ff] mt-0.5">
+              รายการที่ <b>${state.carouselIndex + 1}</b> จากทั้งหมด <b>${pendingList.length}</b> คนที่รออนุมัติ
+            </div>
+          </div>
+
+          <div id="approvalCarouselStage" class="carousel-stage mb-2">
+            <div class="drop-slot-outline pointer-events-none">
+              <span class="text-[10px] font-bold text-white/60">↓ ปัดลงเพื่ออนุมัติ · ↑ ปัดขึ้นดูรายละเอียด</span>
+            </div>
+            ${cardsHtml}
+          </div>
+
+          <div class="flex items-center justify-center gap-3 mb-3">
+            <button type="button" onclick="stepCarousel(-1)" ${state.carouselIndex <= 0 ? 'disabled' : ''}
+                    class="w-9 h-9 rounded-full bg-white text-[#19143c] border-2 border-[#19143c] font-bold text-base flex items-center justify-center cursor-pointer disabled:opacity-35">
+              ‹
+            </button>
+            <div class="flex items-center gap-1.5">
+              ${pendingList.map((_, i) => `
+                <button type="button" onclick="jumpCarousel(${i})"
+                        class="h-2.5 rounded-full transition-all cursor-pointer ${i === state.carouselIndex ? 'w-6 bg-[#ffb98a]' : 'w-2.5 bg-white/30'}"></button>
+              `).join('')}
+            </div>
+            <button type="button" onclick="stepCarousel(1)" ${state.carouselIndex >= pendingList.length - 1 ? 'disabled' : ''}
+                    class="w-9 h-9 rounded-full bg-white text-[#19143c] border-2 border-[#19143c] font-bold text-base flex items-center justify-center cursor-pointer disabled:opacity-35">
+              ›
+            </button>
+          </div>
+
+          <div class="comic-card p-3 space-y-2">
+            <button type="button" onclick="openApprovalDetail('${activeReq.id}')"
+                    class="comic-btn w-full py-2.5 bg-[#4b29f2] text-white text-xs">
+              📋 เปิดดูรายละเอียดและหลักฐานของ ${activeReq.firstName}
+            </button>
+            <div class="grid grid-cols-2 gap-2">
+              <button type="button" onclick="decideRequest('${activeReq.id}', 'approved')"
+                      class="comic-btn py-2.5 bg-[#36c78c] text-[#19143c] text-xs">
+                ✓ อนุมัติทันที
+              </button>
+              <button type="button" onclick="decideRequest('${activeReq.id}', 'rejected')"
+                      class="comic-btn py-2.5 bg-[#ffe0e5] text-[#8f1526] text-xs">
+                ✕ ไม่อนุมัติ
+              </button>
+            </div>
+            <button type="button" onclick="deleteTeamRequest('${activeReq.id}')"
+                    class="w-full py-2 rounded-full border-2 border-[#19143c] bg-[#ffd6dc] hover:bg-[#ff5c72] hover:text-white text-[#8f1526] text-xs font-bold cursor-pointer transition-colors">
+              🗑️ ลบรายการขอ${activeReq.type === 'ot' ? ' OT' : 'ลาพักร้อน'}ของ ${activeReq.firstName}
+            </button>
+          </div>
+        ` : `
+          <div class="comic-card p-6 text-center space-y-2.5">
+            <div class="w-14 h-14 mx-auto">
+              ${renderMoodSvg(0)}
+            </div>
+            <h3 class="text-base font-bold text-[#19143c]">เคลียร์ครบทุกรายการแล้ว!</h3>
+            <p class="text-xs text-[#7a76a3]">รายการที่กดอนุมัติถูกย้ายไปเก็บที่แท็บ <b>ประวัติการอนุมัติ</b> เรียบร้อยแล้ว</p>
+            <button type="button" onclick="setApprovalSubTab('history')"
+                    class="comic-btn px-4 py-2 bg-[#c9f7e2] text-[#19143c] text-xs">
+              ดูประวัติการอนุมัติ →
+            </button>
+          </div>
+        `}
+      ` : `
+        <div class="comic-card p-3.5 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-[#19143c]">ประวัติที่ดำเนินการแล้ว</h3>
+            <span class="text-xs font-semibold text-[#7a76a3]">${historyList.length} รายการ · แตะเพื่อกาง/พับ</span>
+          </div>
+          ${historyList.length ? historyList.map(r => {
+            const isOT = r.type === 'ot';
+            const expanded = expandedHistoryId === r.id;
+            const hrs = r.hours || calcOTHours(r.timeIn || '09:00', r.timeOut || '20:00');
+            const photoSrc = isOT ? (r.photo || '') : '';
+            return `
+              <div class="border-2 border-[#19143c] rounded-2xl bg-[#faf8ff] overflow-hidden">
+                <div onclick="toggleHistoryItem('${r.id}')" class="p-3 cursor-pointer hover:bg-[#f3f0ff] transition-colors">
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-1.5 min-w-0">
+                      <b class="text-xs text-[#19143c] truncate">${r.firstName} ${r.lastName}</b>
+                      <span class="px-2 py-0.5 rounded-full bg-[#ece8ff] border border-[#19143c] text-[10px] font-bold text-[#19143c] flex-none">${r.empId}</span>
+                    </div>
+                    <span class="px-2.5 py-0.5 rounded-full border border-[#19143c] text-[10px] font-bold flex-none ${r.status === 'approved' ? 'bg-[#c9f7e2] text-[#115c33]' : 'bg-[#ffd6dc] text-[#8f1526]'}">
+                      ${r.status === 'approved' ? '✓ อนุมัติแล้ว' : '✕ ไม่อนุมัติ'}
+                    </span>
+                    <button type="button" onclick="event.stopPropagation(); deleteTeamRequest('${r.id}')"
+                            title="ลบรายการนี้"
+                            class="px-2 py-0.5 rounded-full border border-[#19143c] bg-[#ffe0e5] hover:bg-[#ff5c72] hover:text-white text-[10px] font-bold text-[#8f1526] flex-none cursor-pointer">
+                      🗑️ ลบ
+                    </button>
+                  </div>
+                  <div class="flex items-center justify-between gap-2 mt-1">
+                    <div class="text-xs font-bold text-[#4b29f2]">
+                      ${isOT ? `⚡ โอที (+${hrs} ชม.) · ${formatThaiShort(r.from)}` : `🌴 ลาพักร้อน: ${formatThaiShort(r.from)} – ${formatThaiShort(r.to || r.from)}`}
+                    </div>
+                    <span class="text-[11px] font-bold text-[#19143c] flex-none">${expanded ? '▲ พับเก็บ' : '▼ ดูรายละเอียด'}</span>
+                  </div>
+                  ${r.decidedAt ? `<div class="text-[10px] text-[#7a76a3] mt-0.5">ดำเนินการเมื่อ: ${r.decidedAt}</div>` : ''}
+                </div>
+
+                ${expanded ? `
+                  <div class="px-3 pb-3 pt-2 border-t-2 border-dashed border-[#d6d1ff] bg-white space-y-2 text-xs text-[#19143c]">
+                    ${isOT ? `
+                      <div class="grid grid-cols-3 gap-1.5 text-center">
+                        <div class="bg-[#f3f0ff] border border-[#19143c] rounded-xl p-1.5">
+                          <div class="text-[10px] text-[#7a76a3] font-semibold">เข้างาน</div>
+                          <div class="font-extrabold text-[#19143c]">${r.timeIn || '09:00'} น.</div>
+                        </div>
+                        <div class="bg-[#f3f0ff] border border-[#19143c] rounded-xl p-1.5">
+                          <div class="text-[10px] text-[#7a76a3] font-semibold">เลิกงาน</div>
+                          <div class="font-extrabold text-[#19143c]">${r.timeOut || '20:00'} น.</div>
+                        </div>
+                        <div class="bg-[#ffe8d6] border border-[#19143c] rounded-xl p-1.5">
+                          <div class="text-[10px] text-[#7a76a3] font-semibold">โอทีสุทธิ</div>
+                          <div class="font-extrabold text-[#4b29f2]">+${hrs} ชม.</div>
+                        </div>
+                      </div>
+                    ` : `
+                      <div class="bg-[#effcf6] border border-[#19143c] rounded-xl p-2">
+                        <b>ช่วงวันลา:</b> ${formatThaiShort(r.from)} – ${formatThaiShort(r.to || r.from)} (${calcLeaveDays(r.from, r.to || r.from)} วัน)
+                      </div>
+                    `}
+                    <div>
+                      <span class="font-bold text-[#7a76a3]">รายละเอียด:</span>
+                      <span class="font-semibold text-[#19143c]">${r.note || '-'}</span>
+                    </div>
+                    ${photoSrc ? `
+                      <div onclick="openPhotoViewer('${photoSrc}', 'รูปเช็คเอาท์ของ ${r.firstName} ${r.lastName} (${r.empId})')" class="relative cursor-pointer">
+                        <img src="${photoSrc}" alt="รูปเช็คเอาท์" class="w-full max-h-36 object-cover rounded-xl border-2 border-[#19143c] bg-[#19143c]">
+                        <span class="absolute right-2 bottom-2 bg-[#19143c]/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">🔍 แตะขยายรูป</span>
+                      </div>
+                    ` : ''}
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }).join('') : `<p class="text-xs text-[#7a76a3] text-center py-4">ยังไม่มีประวัติการอนุมัติ</p>`}
+        </div>
+      `}
+    `;
+
+    const card = document.getElementById('activeCenterCard');
+    const stage = document.getElementById('approvalCarouselStage');
+    if (!card || !activeReqId) return;
+
+    let startX = 0;
+    let startY = 0;
+    let dx = 0;
+    let dy = 0;
+    let dragging = false;
+    let wheelAccumY = 0;
+
+    const triggerSwipeUpDetail = () => {
+      card.style.transition = 'transform 0.22s ease, opacity 0.2s ease';
+      card.style.transform = 'translateX(0px) translateY(-105px) scale(0.94)';
+      card.style.opacity = '0.25';
+      setTimeout(() => {
+        card.style.transition = '';
+        card.style.transform = 'translateX(0px) translateY(0px) rotate(0deg) scale(1)';
+        card.style.opacity = '1';
+        openApprovalDetail(activeReqId);
+      }, 170);
+    };
+
+    const triggerSwipeDownApprove = () => {
+      card.style.transition = 'transform 0.22s ease, opacity 0.2s ease';
+      card.style.transform = 'translateX(0px) translateY(115px) scale(0.92)';
+      card.style.opacity = '0.2';
+      setTimeout(() => {
+        decideRequest(activeReqId, 'approved');
+      }, 170);
+    };
+
+    const onStart = (x, y) => {
+      startX = x;
+      startY = y;
+      dx = 0;
+      dy = 0;
+      dragging = true;
+      card.classList.add('dragging');
+    };
+
+    const onMove = (x, y) => {
+      if (!dragging) return;
+      dx = x - startX;
+      dy = y - startY;
+
+      if (Math.abs(dx) >= Math.abs(dy)) {
+        const rot = dx * 0.08;
+        card.style.transform = `translateX(${dx}px) translateY(0px) rotate(${rot}deg) scale(1)`;
+      } else {
+        const clampedY = Math.max(-115, Math.min(135, dy));
+        const scale = 1 - Math.abs(clampedY) * 0.0007;
+        card.style.transform = `translateX(0px) translateY(${clampedY}px) rotate(0deg) scale(${scale})`;
+      }
+    };
+
+    const onEnd = () => {
+      if (!dragging) return;
+      dragging = false;
+      card.classList.remove('dragging');
+
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+        card.style.transform = 'translateX(0px) translateY(0px) rotate(0deg) scale(1)';
+        openApprovalDetail(activeReqId);
+        return;
+      }
+
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+        if (dx < 0) stepCarousel(1);
+        else stepCarousel(-1);
+        return;
+      }
+
+      if (dy > 55 && Math.abs(dy) > Math.abs(dx)) {
+        triggerSwipeDownApprove();
+        return;
+      }
+
+      if (dy < -50 && Math.abs(dy) > Math.abs(dx)) {
+        triggerSwipeUpDetail();
+        return;
+      }
+
+      card.style.transform = 'translateX(0px) translateY(0px) rotate(0deg) scale(1)';
+    };
+
+    card.addEventListener('touchstart', e => {
+      const t = e.touches[0];
+      onStart(t.clientX, t.clientY);
+    }, { passive: true });
+    card.addEventListener('touchmove', e => {
+      const t = e.touches[0];
+      onMove(t.clientX, t.clientY);
+    }, { passive: true });
+    card.addEventListener('touchend', onEnd);
+
+    card.addEventListener('mousedown', e => {
+      onStart(e.clientX, e.clientY);
+      const handleMouseMove = ev => onMove(ev.clientX, ev.clientY);
+      const handleMouseUp = () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+        onEnd();
+      };
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    });
+
+    if (stage) {
+      stage.addEventListener('wheel', e => {
+        e.preventDefault();
+        wheelAccumY += e.deltaY;
+        const previewOffset = Math.max(-100, Math.min(110, -wheelAccumY * 0.45));
+        card.style.transform = `translateX(0px) translateY(${previewOffset}px) scale(0.95)`;
+        if (wheelAccumY >= 70) {
+          wheelAccumY = 0;
+          triggerSwipeDownApprove();
+        } else if (wheelAccumY <= -70) {
+          wheelAccumY = 0;
+          triggerSwipeUpDetail();
+        }
+      }, { passive: false });
+    }
+  }
+
+  function openPhotoViewer(src, captionText) {
+    if (!src) return;
+    const modal = document.getElementById('photoViewerModal');
+    const img = document.getElementById('photoViewerImg');
+    const cap = document.getElementById('photoViewerCaption');
+    if (!modal || !img) return;
+    img.src = src;
+    if (cap) cap.textContent = captionText || 'หลักฐานรูปเช็คเอาท์';
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+
+  function closePhotoViewer() {
+    const modal = document.getElementById('photoViewerModal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+
+  function openApprovalDetail(reqId) {
+    if (!isManager()) {
+      showToast(`เฉพาะผู้อนุมัติ ${APPROVER_ID} เท่านั้น`);
+      return;
+    }
+    const req = state.teamRequests.find(r => r.id === reqId);
+    const sheet = document.getElementById('approvalDetailSheet');
+    const body = document.getElementById('approvalDetailBody');
+    const heading = document.getElementById('approvalDetailHeading');
+    if (!req || !sheet || !body) return;
+
+    const isOT = req.type === 'ot';
+    const hrs = req.hours || calcOTHours(req.timeIn || '09:00', req.timeOut || '20:00');
+    const dateLabel = isOT
+      ? `${formatBangkokFullDate(req.from)} (${req.timeIn || '09:00'}–${req.timeOut || '20:00'})`
+      : `${formatThaiShort(req.from)} – ${formatThaiShort(req.to || req.from)} (${calcLeaveDays(req.from, req.to || req.from)} วัน)`;
+
+    if (heading) {
+      heading.textContent = isOT ? `รายละเอียดขอ OT · ${req.firstName}` : `รายละเอียดลาพักร้อน · ${req.firstName}`;
+    }
+
+    body.innerHTML = `
+      <div class="comic-card p-4 space-y-3">
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <div class="text-base font-extrabold text-[#19143c]">${req.firstName} ${req.lastName}</div>
+            <div class="text-xs font-bold text-[#7a76a3]">รหัสพนักงาน: ${req.empId} · ส่งถึง ${req.approverId || APPROVER_ID}</div>
+          </div>
+          <span class="px-3 py-1 rounded-full border-2 border-[#19143c] text-xs font-extrabold ${isOT ? 'bg-[#ffe8d6] text-[#19143c]' : 'bg-[#c9f7e2] text-[#115c33]'}">
+            ${isOT ? `+${hrs} ชม.` : 'ลาพักร้อน'}
+          </span>
+        </div>
+
+        <div class="bg-[#f3f0ff] border-2 border-[#19143c] rounded-2xl p-3 text-xs space-y-1">
+          <div><b class="text-[#7a76a3]">วันที่ / ช่วงเวลา:</b> <span class="font-bold text-[#19143c]">${dateLabel}</span></div>
+          <div><b class="text-[#7a76a3]">รายละเอียดงาน:</b> <span class="font-bold text-[#19143c]">${req.note || '-'}</span></div>
+          ${req.checkoutLocation ? `<div><b class="text-[#7a76a3]">สถานที่เช็คเอาท์:</b> <span class="font-bold text-[#19143c]">${req.checkoutLocation}</span></div>` : ''}
+        </div>
+
+        ${isOT && req.photo ? `
+          <div onclick="openPhotoViewer('${req.photo}', 'รูปเช็คเอาท์ของ ${req.firstName} ${req.lastName} (${req.empId})')" class="relative cursor-pointer">
+            <img src="${req.photo}" alt="รูปหลักฐานเช็คเอาท์" class="w-full max-h-56 object-contain rounded-2xl border-2 border-[#19143c] bg-[#19143c]">
+            <span class="absolute right-2.5 bottom-2.5 bg-[#19143c]/90 text-white text-[11px] font-bold px-2.5 py-1 rounded-full">🔍 แตะขยายรูป</span>
+          </div>
+        ` : ''}
+
+        <div class="grid grid-cols-2 gap-2.5 pt-1">
+          <button type="button" onclick="decideRequest('${req.id}', 'approved')" class="comic-btn py-2.5 bg-[#36c78c] text-[#19143c] text-xs">
+            ✓ อนุมัติคำขอ
+          </button>
+          <button type="button" onclick="decideRequest('${req.id}', 'rejected')" class="comic-btn py-2.5 bg-[#ffe0e5] text-[#8f1526] text-xs">
+            ✕ ไม่อนุมัติ
+          </button>
+        </div>
+      </div>
+    `;
+
+    sheet.classList.remove('hidden');
+    sheet.classList.add('flex');
+  }
+
+  function closeApprovalDetail() {
+    const sheet = document.getElementById('approvalDetailSheet');
+    if (!sheet) return;
+    sheet.classList.add('hidden');
+    sheet.classList.remove('flex');
+  }
+
+  function decideRequest(reqId, decision) {
+    if (!isManager()) {
+      showToast(`เฉพาะผู้อนุมัติ ${APPROVER_ID} เท่านั้นที่อนุมัติคำขอได้`);
+      return;
+    }
+    const req = state.teamRequests.find(r => r.id === reqId);
+    if (!req) return;
+
+    req.status = decision;
+    req.decidedAt = `${formatThaiShort(TODAY)} ${getBangkokLiveClock()}`;
+
+    if (state.items[req.from] && (!state.items[req.from].empId || state.items[req.from].empId === req.empId)) {
+      state.items[req.from].status = decision;
+      window.cloudStore?.saveCalendarItem(req.from, state.items[req.from]);
+    }
+    window.cloudStore?.saveRequest(req);
+
+    closeApprovalDetail();
+    renderApp();
+    showToast(
+      decision === 'approved'
+        ? `อนุมัติคำขอของ ${req.firstName} (${req.empId}) เรียบร้อยแล้ว ✓`
+        : `บันทึกสถานะ "ไม่อนุมัติ" ของ ${req.firstName} (${req.empId}) แล้ว`
+    );
+  }
+
+  function renderProfileTab(container) {
+    const u = state.user || { firstName: 'ผู้ใช้งาน', lastName: '', empId: 'EMP-0001' };
+    const managerMode = isManager();
+    const hasCustomAvatar = Boolean(getUserAvatarSrc(u));
+    const teamLeaves = state.teamRequests.filter(r => r.type === 'leave' && r.status !== 'rejected');
+    const employeeAccounts = Object.values(registeredAccounts).filter(
+      acc => (acc.empId || '').trim().toUpperCase() !== APPROVER_ID
+    );
+
+    container.innerHTML = `
+      <div class="comic-card p-4 mb-3 flex items-center gap-3">
+        <div class="w-16 h-16 flex-none">
+          ${renderUserAvatarHtml(1, 'w-16 h-16', u)}
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="text-base font-bold text-[#19143c] truncate">${u.firstName} ${u.lastName}</div>
+          <div class="text-xs text-[#7a76a3]">รหัส: <b>${u.empId}</b>${managerMode ? '' : ` · ส่งคำขอไปที่ <b>${APPROVER_ID}</b>`}</div>
+          <div class="flex flex-wrap gap-1.5 mt-2">
+            <button type="button" onclick="document.getElementById('profilePhotoUpload').click()"
+                    class="px-3 py-1 rounded-full border-2 border-[#19143c] bg-[#ffb98a] hover:bg-[#ffa66b] text-[11px] font-bold text-[#19143c] cursor-pointer">
+              📷 อัปรูปโปรไฟล์
+            </button>
+            ${hasCustomAvatar ? `
+              <button type="button" onclick="clearProfilePhoto()"
+                      class="px-3 py-1 rounded-full border-2 border-[#19143c] bg-[#f3f0ff] hover:bg-[#ffe0e5] text-[11px] font-bold text-[#8f1526] cursor-pointer">
+                ลบรูป
+              </button>
+            ` : ''}
+          </div>
+        </div>
+      </div>
+
+      ${managerMode ? `
+        <div class="comic-card p-4 mb-3">
+          <div class="flex items-center justify-between gap-2 mb-0.5">
+            <h3 class="text-sm font-bold text-[#19143c]">👥 จัดการบัญชีพนักงานในระบบ</h3>
+            <span class="px-2 py-0.5 rounded-full bg-[#ffe8d6] border border-[#19143c] text-[10px] font-bold text-[#19143c]">${employeeAccounts.length} บัญชี</span>
+          </div>
+          <p class="text-[11px] text-[#7a76a3] mb-2.5">ผู้อนุมัติ ${APPROVER_ID} สามารถลบบัญชีพนักงานคนอื่นออกจากระบบได้</p>
+          ${employeeAccounts.length ? employeeAccounts.map(acc => `
+            <div class="flex items-center justify-between gap-2 py-2 border-b border-dashed border-[#e2defa] last:border-b-0 text-xs">
+              <div class="min-w-0">
+                <div class="font-bold text-[#19143c] truncate">${acc.firstName} ${acc.lastName}</div>
+                <div class="text-[11px] text-[#7a76a3]">รหัส: <b>${acc.empId}</b></div>
+              </div>
+              <button type="button" onclick="deleteEmployeeAccount('${acc.empId}')"
+                      class="px-3 py-1.5 rounded-full border-2 border-[#19143c] bg-[#ffe0e5] hover:bg-[#ff5c72] hover:text-white text-[11px] font-bold text-[#8f1526] flex-none cursor-pointer transition-colors">
+                🗑️ ลบบัญชี
+              </button>
+            </div>
+          `).join('') : `<p class="text-xs text-[#7a76a3] text-center py-2">ยังไม่มีบัญชีพนักงานในระบบ</p>`}
+        </div>
+      ` : ''}
+
+      <div class="comic-card p-4 mb-3">
+        <h3 class="text-sm font-bold text-[#19143c] mb-0.5">รายการวันลาในทีม</h3>
+        <p class="text-[11px] text-[#7a76a3] mb-2.5">หากเลือกวันลาพักร้อนตรงกับช่วงเวลาเหล่านี้ ระบบจะแจ้งเตือนทันที</p>
+        ${teamLeaves.length ? teamLeaves.map(lv => `
+          <div class="flex items-center justify-between gap-2 py-2 border-b border-dashed border-[#e2defa] last:border-b-0 text-xs">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <b class="text-[#19143c] truncate">${lv.firstName} ${lv.lastName}</b>
+              <span class="px-2 py-0.5 rounded-full bg-[#ece8ff] border border-[#19143c] text-[10px] font-bold text-[#19143c] flex-none">${lv.empId}</span>
+            </div>
+            <span class="font-bold text-[#4b29f2] flex-none">${formatThaiShort(lv.from)} – ${formatThaiShort(lv.to || lv.from)}</span>
+          </div>
+        `).join('') : `<p class="text-xs text-[#7a76a3] text-center py-2">ยังไม่มีรายการวันลาในทีม</p>`}
+      </div>
+
+      <button type="button" onclick="triggerInstallApp()" class="comic-btn w-full py-2.5 mb-2.5 bg-[#c9f7e2] text-[#19143c] text-xs">
+        📲 ติดตั้งแอป oto ลงเครื่อง
+      </button>
+
+      <button type="button" onclick="openLoginScreen()" class="comic-btn w-full py-3 bg-[#ffe0e5] text-[#8f1526] text-sm">
+        ออกจากระบบ / สลับผู้ใช้งาน
+      </button>
+    `;
+  }
+
+  let pendingDeleteEmpId = null;
+  let pendingDeleteReqId = null;
+
+  // ลบรายการขอ OT หรือ ลาพักร้อนเฉพาะรายการโดยผู้อนุมัติ SM2080797
+  function deleteTeamRequest(reqId) {
+    if (!isManager()) {
+      showToast(`เฉพาะผู้อนุมัติ ${APPROVER_ID} เท่านั้นที่ลบรายการคำขอได้`);
+      return;
+    }
+    const target = state.teamRequests.find(r => r.id === reqId);
+    if (!target) {
+      showToast('ไม่พบรายการที่ต้องการลบ');
+      return;
+    }
+
+    if (pendingDeleteReqId !== reqId) {
+      pendingDeleteReqId = reqId;
+      const kindLabel = target.type === 'ot' ? 'ขอ OT' : 'ลาพักร้อน';
+      showToast(`กดปุ่มลบของ ${target.firstName} (${kindLabel}) อีกครั้งเพื่อยืนยันการลบ`);
+      clearTimeout(deleteTeamRequest._timer);
+      deleteTeamRequest._timer = setTimeout(() => {
+        pendingDeleteReqId = null;
+      }, 5000);
+      return;
+    }
+
+    pendingDeleteReqId = null;
+    state.teamRequests = state.teamRequests.filter(r => r.id !== reqId);
+    window.cloudStore?.deleteRequest(reqId);
+
+    // ลบรายการที่ตรงกันบนปฏิทินด้วย หากไม่มีรายการอื่นของพนักงานคนนั้นในวันเดียวกันเหลืออยู่
+    const targetEmp = (target.empId || '').trim().toUpperCase();
+    const stillHasSameDay = state.teamRequests.some(
+      r => (r.empId || '').trim().toUpperCase() === targetEmp && r.type === target.type && r.from === target.from && r.status !== 'rejected'
+    );
+    if (!stillHasSameDay && state.items[target.from] && state.items[target.from].type === target.type) {
+      delete state.items[target.from];
+      window.cloudStore?.deleteCalendarItem(targetEmp, target.from);
+    }
+
+    if (expandedHistoryId === reqId) {
+      expandedHistoryId = null;
+    }
+    renderApp();
+    showToast(`ลบรายการ${target.type === 'ot' ? 'ขอ OT' : 'ลาพักร้อน'}ของ ${target.firstName} (${target.empId}) เรียบร้อยแล้ว ✓`);
+  }
+
+  function deleteEmployeeAccount(empId) {
+    if (!isManager()) {
+      showToast(`เฉพาะผู้อนุมัติ ${APPROVER_ID} เท่านั้นที่ลบบัญชีพนักงานได้`);
+      return;
+    }
+    const cleanId = (empId || '').trim().toUpperCase();
+    if (!cleanId || cleanId === APPROVER_ID) {
+      showToast('ไม่สามารถลบบัญชีผู้อนุมัติหลักได้');
+      return;
+    }
+    if (!registeredAccounts[cleanId]) {
+      showToast(`ไม่พบบัญชี ${cleanId}`);
+      return;
+    }
+
+    // กดครั้งแรกเพื่อยืนยัน กดซ้ำภายใน 5 วินาทีเพื่อลบทันที (หลีกเลี่ยงการใช้ confirm())
+    if (pendingDeleteEmpId !== cleanId) {
+      pendingDeleteEmpId = cleanId;
+      const targetName = `${registeredAccounts[cleanId].firstName} ${registeredAccounts[cleanId].lastName}`.trim();
+      showToast(`กดปุ่ม "🗑️ ลบบัญชี" ของ ${targetName} (${cleanId}) อีกครั้งเพื่อยืนยันการลบ`);
+      clearTimeout(deleteEmployeeAccount._timer);
+      deleteEmployeeAccount._timer = setTimeout(() => {
+        pendingDeleteEmpId = null;
+      }, 5000);
+      return;
+    }
+
+    pendingDeleteEmpId = null;
+    const removed = registeredAccounts[cleanId];
+    delete registeredAccounts[cleanId];
+    window.cloudStore?.deleteAccount(cleanId);
+
+    const removedReqs = state.teamRequests.filter(r => (r.empId || '').trim().toUpperCase() === cleanId);
+    removedReqs.forEach(r => window.cloudStore?.deleteRequest(r.id));
+    state.teamRequests = state.teamRequests.filter(r => (r.empId || '').trim().toUpperCase() !== cleanId);
+
+    // ลบรายการ OT และวันลาพักร้อนบนปฏิทินที่เป็นของบัญชีที่ถูกลบออกไปด้วย
+    Object.entries(state.items).forEach(([dateKey, item]) => {
+      if (!item) return;
+      const itemEmp = (item.empId || '').trim().toUpperCase();
+      if (itemEmp === cleanId) {
+        delete state.items[dateKey];
+        window.cloudStore?.deleteCalendarItem(cleanId, dateKey);
+      }
+    });
+    allCloudCalendarItems
+      .filter(it => (it.empId || '').trim().toUpperCase() === cleanId)
+      .forEach(it => window.cloudStore?.deleteCalendarItem(cleanId, it.dateKey));
+
+    renderApp();
+    showToast(`ลบบัญชี ${removed.firstName} ${removed.lastName} (${cleanId}) และรายการคำขอ/วันลาบนปฏิทินเรียบร้อยแล้ว ✓`);
+  }
+
+  function escapeExcelHtml(val) {
+    return String(val ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function downloadTeamOtExcel() {
+    if (!isManager()) {
+      showToast(`เฉพาะผู้อนุมัติ ${APPROVER_ID} เท่านั้นที่ดาวน์โหลดสรุป OT ทุกคนได้`);
+      return;
+    }
+
+    const otReqs = state.teamRequests.filter(r => r.type === 'ot' && r.status !== 'rejected');
+    const byPersonMap = new Map();
+    otReqs.forEach(r => {
+      const hrs = Number(r.hours) || calcOTHours(r.timeIn, r.timeOut) || 0;
+      const prev = byPersonMap.get(r.empId) || {
+        empId: r.empId,
+        fullName: `${r.firstName} ${r.lastName}`,
+        hours: 0,
+        count: 0
+      };
+      prev.hours = Math.round((prev.hours + hrs) * 10) / 10;
+      prev.count += 1;
+      byPersonMap.set(r.empId, prev);
+    });
+
+    const personSummaryRows = Array.from(byPersonMap.values()).sort((a, b) => b.hours - a.hours);
+    const totalHours = Math.round(personSummaryRows.reduce((sum, p) => sum + p.hours, 0) * 10) / 10;
+    const statusText = (s) => s === 'approved' ? 'อนุมัติแล้ว' : s === 'rejected' ? 'ไม่อนุมัติ' : 'รออนุมัติ';
+
+    const excelHtml = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="utf-8">
+        <style>
+          table { border-collapse: collapse; font-family: 'Prompt', Tahoma, sans-serif; font-size: 12pt; }
+          th { background-color: #19143c; color: #ffffff; border: 1px solid #19143c; padding: 8px; }
+          td { border: 1px solid #cbd5e1; padding: 6px 8px; }
+          .num { text-align: right; }
+          .total-row td { background-color: #ffe8d6; font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <h3>สรุปการทำ OT ของพนักงานทุกคน (${escapeExcelHtml(APPROVER_ID)})</h3>
+        <p>วันที่ออกรายงาน: ${escapeExcelHtml(formatThaiShort(TODAY))} · เวลาไทย: ${escapeExcelHtml(getBangkokLiveClock())}</p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>รหัสพนักงาน</th>
+              <th>ชื่อ–นามสกุล</th>
+              <th>จำนวนครั้งที่ขอ OT</th>
+              <th>ชั่วโมง OT สุทธิรวม (ชม.)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${personSummaryRows.length ? personSummaryRows.map(p => `
+              <tr>
+                <td>${escapeExcelHtml(p.empId)}</td>
+                <td>${escapeExcelHtml(p.fullName)}</td>
+                <td class="num">${p.count}</td>
+                <td class="num">${p.hours}</td>
+              </tr>
+            `).join('') : `<tr><td colspan="4" style="text-align:center;">ไม่มีข้อมูลการทำ OT</td></tr>`}
+            <tr class="total-row">
+              <td colspan="2">รวม OT ของทุกคน</td>
+              <td class="num">${otReqs.length}</td>
+              <td class="num">${totalHours}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <br>
+        <h4>รายละเอียดรายการขอ OT รายครั้ง</h4>
+        <table>
+          <thead>
+            <tr>
+              <th>วันที่</th>
+              <th>รหัสพนักงาน</th>
+              <th>ชื่อ–นามสกุล</th>
+              <th>เวลาเข้างาน</th>
+              <th>เวลาเลิกงาน</th>
+              <th>ชั่วโมง OT (ชม.)</th>
+              <th>รายละเอียดงาน</th>
+              <th>สถานะ</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${otReqs.length ? otReqs.map(r => {
+              const hrs = Number(r.hours) || calcOTHours(r.timeIn, r.timeOut) || 0;
+              return `
+                <tr>
+                  <td>${escapeExcelHtml(formatThaiShort(r.from))}</td>
+                  <td>${escapeExcelHtml(r.empId)}</td>
+                  <td>${escapeExcelHtml(`${r.firstName} ${r.lastName}`)}</td>
+                  <td>${escapeExcelHtml(r.timeIn || '09:00')}</td>
+                  <td>${escapeExcelHtml(r.timeOut || '20:00')}</td>
+                  <td class="num">${hrs}</td>
+                  <td>${escapeExcelHtml(r.note || '')}</td>
+                  <td>${escapeExcelHtml(statusText(r.status))}</td>
+                </tr>
+              `;
+            }).join('') : `<tr><td colspan="8" style="text-align:center;">ไม่มีรายละเอียดการทำ OT</td></tr>`}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    try {
+      const blob = new Blob(['\ufeff', excelHtml], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `สรุป-OT-ทุกคน-${TODAY}.xls`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      showToast('ดาวน์โหลดไฟล์ Excel สรุป OT ทุกคนเรียบร้อยแล้ว ✓');
+    } catch (err) {
+      showToast('ไม่สามารถดาวน์โหลดไฟล์ Excel ได้ในเบราว์เซอร์นี้');
+    }
+  }
+
+  function openDaySheet(dateKey) {
+    if (isManager()) {
+      showToast(`สิทธิ์ผู้อนุมัติ ${APPROVER_ID} ไม่สามารถบันทึกหรือแก้ไขเวลาของใครได้`);
+      return;
+    }
+    currentDateKey = dateKey;
+    const existing = state.items[dateKey];
+    const [y, m, d] = dateKey.split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d));
+
+    document.getElementById('calMonthBadge').textContent = TH_SHORT[m - 1];
+    document.getElementById('calDayBadge').textContent = d;
+    document.getElementById('calWeekBadge').textContent = TH_DAYS[dt.getUTCDay()];
+    document.getElementById('sheetFullDate').innerHTML =
+      `${formatBangkokFullDate(dateKey)} · <span id="sheetLiveClock" class="font-bold text-[#ffb98a]">${getBangkokLiveClock()}</span>`;
+
+    currentMode = existing?.type || 'ot';
+    currentMood = existing?.mood ?? 0;
+    currentPhoto = existing?.photo || '';
+
+    document.getElementById('inpTimeIn').value = existing?.timeIn || '09:00';
+    document.getElementById('inpTimeOut').value = existing?.timeOut || '20:00';
+    document.getElementById('inpWorkNote').value = existing?.note || '';
+    document.getElementById('inpLeaveFrom').value = dateKey;
+    document.getElementById('inpLeaveTo').value = existing?.to || dateKey;
+    syncLeaveProfileOwnerDisplay();
+    if (existing?.type === 'leave' && existing.to) {
+      const days = calcLeaveDays(dateKey, existing.to);
+      if (days > MAX_CONSECUTIVE_LEAVE_DAYS) {
+        document.getElementById('inpLeaveTo').value = addDaysYMD(dateKey, MAX_CONSECUTIVE_LEAVE_DAYS - 1);
+      }
+    }
+    leavePickerTarget = null;
+    const pop = document.getElementById('leaveDatePopover');
+    if (pop) pop.classList.add('hidden');
+    syncLeaveDateLabels();
+
+    const chip = document.getElementById('sheetStatusChip');
+    if (existing) {
+      chip.innerHTML = `<span class="px-2.5 py-0.5 rounded-full border border-[#19143c] text-[11px] font-bold ${existing.status === 'approved' ? 'bg-[#c9f7e2] text-[#115c33]' : existing.status === 'rejected' ? 'bg-[#ffd6dc] text-[#8f1526]' : 'bg-[#dcebff] text-[#14468c]'}">${existing.status === 'approved' ? 'อนุมัติแล้ว' : existing.status === 'rejected' ? 'ไม่อนุมัติ' : 'รออนุมัติ'}</span>`;
+    } else {
+      chip.innerHTML = '';
+    }
+
+    document.getElementById('btnDeleteEntry').classList.toggle('hidden', !existing);
+    updateMoodDisplay();
+    setEntryMode(currentMode);
+
+    if (currentMode === 'ot') {
+      const tInput = document.getElementById('inpCheckoutTime');
+      if (tInput && !tInput.value.trim()) tInput.value = getBangkokLiveClock();
+      detectCheckoutLocation(true);
+    }
+
+    const sheet = document.getElementById('daySheet');
+    sheet.classList.remove('hidden');
+    sheet.classList.add('flex');
+  }
+
+  function closeDaySheet() {
+    stopLiveCamera();
+    const sheet = document.getElementById('daySheet');
+    sheet.classList.add('hidden');
+    sheet.classList.remove('flex');
+    renderApp();
+  }
+
+  function cycleMood() {
+    currentMood = (currentMood + 1) % MOODS.length;
+    updateMoodDisplay();
+  }
+
+  function updateMoodDisplay() {
+    document.getElementById('sheetMoodBox').innerHTML = `<div class="w-16 h-16">${renderMoodSvg(currentMood)}</div>`;
+    document.getElementById('sheetMoodLabel').textContent = MOODS[currentMood].label;
+  }
+
+  function setEntryMode(mode) {
+    currentMode = mode;
+    const btnOT = document.getElementById('btnModeOT');
+    const btnLV = document.getElementById('btnModeLeave');
+    const formOT = document.getElementById('formOT');
+    const formLV = document.getElementById('formLeave');
+
+    if (mode === 'ot') {
+      btnOT.className = 'py-2.5 px-3 rounded-2xl border-2.5 border-[#19143c] bg-[#ffb98a] text-[#19143c] font-bold text-sm cursor-pointer shadow-[0_3px_0_#2d2666]';
+      btnLV.className = 'py-2.5 px-3 rounded-2xl border-2.5 border-white/25 bg-white/10 text-white font-bold text-sm cursor-pointer';
+      formOT.classList.remove('hidden');
+      formLV.classList.add('hidden');
+      const tInput = document.getElementById('inpCheckoutTime');
+      if (tInput && !tInput.value.trim()) tInput.value = getBangkokLiveClock();
+      detectCheckoutLocation(true);
+    } else {
+      btnLV.className = 'py-2.5 px-3 rounded-2xl border-2.5 border-[#19143c] bg-[#ffb98a] text-[#19143c] font-bold text-sm cursor-pointer shadow-[0_3px_0_#2d2666]';
+      btnOT.className = 'py-2.5 px-3 rounded-2xl border-2.5 border-white/25 bg-white/10 text-white font-bold text-sm cursor-pointer';
+      formLV.classList.remove('hidden');
+      formOT.classList.add('hidden');
+    }
+    validateForm();
+  }
+
+  function onLeaveDateChange(changedField) {
+    const lfrEl = document.getElementById('inpLeaveFrom');
+    const ltoEl = document.getElementById('inpLeaveTo');
+    if (changedField === 'from' && lfrEl.value) {
+      const maxAllowedTo = addDaysYMD(lfrEl.value, MAX_CONSECUTIVE_LEAVE_DAYS - 1);
+      if (!ltoEl.value || parseDate(ltoEl.value) < parseDate(lfrEl.value)) {
+        ltoEl.value = lfrEl.value;
+      } else if (parseDate(ltoEl.value) > parseDate(maxAllowedTo)) {
+        ltoEl.value = maxAllowedTo;
+        showToast(`ลาพักร้อนต่อเนื่องได้สูงสุด ${MAX_CONSECUTIVE_LEAVE_DAYS} วัน จึงปรับวันสิ้นสุดให้อัตโนมัติ`);
+      }
+    }
+    syncLeaveDateLabels();
+    if (leavePickerTarget) renderLeavePickerCalendar();
+    validateForm();
+  }
+
+  function setLeaveDuration(days) {
+    const clampedDays = Math.max(1, Math.min(MAX_CONSECUTIVE_LEAVE_DAYS, Number(days) || 1));
+    const lfrEl = document.getElementById('inpLeaveFrom');
+    const ltoEl = document.getElementById('inpLeaveTo');
+    const baseStart = lfrEl.value || currentDateKey || TODAY;
+    lfrEl.value = baseStart;
+    ltoEl.value = addDaysYMD(baseStart, clampedDays - 1);
+    syncLeaveDateLabels();
+    if (leavePickerTarget) renderLeavePickerCalendar();
+    validateForm();
+  }
+
+  function syncLeaveDateLabels() {
+    const lfr = document.getElementById('inpLeaveFrom')?.value;
+    const lto = document.getElementById('inpLeaveTo')?.value;
+    const dispFrom = document.getElementById('dispLeaveFrom');
+    const dispTo = document.getElementById('dispLeaveTo');
+    if (dispFrom) dispFrom.textContent = lfr ? formatThaiShort(lfr) : 'เลือกวันเริ่มลา';
+    if (dispTo) dispTo.textContent = lto ? formatThaiShort(lto) : 'เลือกถึงวันที่';
+  }
+
+  function toggleLeaveCalendarPicker(target) {
+    const pop = document.getElementById('leaveDatePopover');
+    if (!pop) return;
+    if (leavePickerTarget === target && !pop.classList.contains('hidden')) {
+      closeLeaveCalendarPicker();
+      return;
+    }
+    leavePickerTarget = target;
+    const seedDate = target === 'to'
+      ? (document.getElementById('inpLeaveTo').value || document.getElementById('inpLeaveFrom').value || currentDateKey || TODAY)
+      : (document.getElementById('inpLeaveFrom').value || currentDateKey || TODAY);
+    const [y, m] = seedDate.split('-').map(Number);
+    leavePickerYM = [y, m - 1];
+    pop.classList.remove('hidden');
+    renderLeavePickerCalendar();
+  }
+
+  function closeLeaveCalendarPicker() {
+    leavePickerTarget = null;
+    const pop = document.getElementById('leaveDatePopover');
+    if (pop) pop.classList.add('hidden');
+  }
+
+  function shiftLeavePickerMonth(delta) {
+    let [y, m] = leavePickerYM;
+    m += delta;
+    if (m < 0) { m = 11; y--; }
+    if (m > 11) { m = 0; y++; }
+    leavePickerYM = [y, m];
+    renderLeavePickerCalendar();
+  }
+
+  function renderLeavePickerCalendar() {
+    const grid = document.getElementById('leavePopGrid');
+    const label = document.getElementById('leavePopMonthLabel');
+    const title = document.getElementById('leavePopTitle');
+    if (!grid || !label || !title) return;
+
+    const [y, m] = leavePickerYM;
+    label.textContent = `${TH_MONTHS[m]} ${y + 543}`;
+    title.textContent = leavePickerTarget === 'to' ? 'เลือกวันสิ้นสุดการลา (สูงสุด 5 วัน)' : 'เลือกวันเริ่มลาพักร้อน';
+
+    const lfrVal = document.getElementById('inpLeaveFrom').value;
+    const ltoVal = document.getElementById('inpLeaveTo').value;
+    const firstDay = new Date(y, m, 1).getDay();
+    const totalDays = new Date(y, m + 1, 0).getDate();
+
+    let html = '';
+    for (let i = 0; i < firstDay; i++) {
+      html += `<span class="h-7"></span>`;
+    }
+
+    for (let d = 1; d <= totalDays; d++) {
+      const ymdStr = formatYMD(y, m, d);
+      const isSelected = (leavePickerTarget === 'to' ? ltoVal : lfrVal) === ymdStr;
+      const inRange = lfrVal && ltoVal && ymdStr >= lfrVal && ymdStr <= ltoVal;
+      const overlap = findLeaveOverlap(ymdStr, ymdStr);
+
+      let btnClass = 'bg-[#f3f0ff] text-[#19143c] hover:bg-[#ffe8d6] border-transparent';
+      if (overlap) btnClass = 'bg-[#ffd6dc] text-[#8f1526] border-[#ff5c72]';
+      else if (inRange) btnClass = 'bg-[#c9f7e2] text-[#115c33] border-[#36c78c] font-bold';
+      if (isSelected) btnClass = 'bg-[#4b29f2] text-white border-[#19143c] font-extrabold';
+
+      html += `
+        <button type="button" onclick="pickLeaveCalendarDate('${ymdStr}')" title="${overlap ? `ลาตรงกับ ${overlap.firstName} (${overlap.empId})` : formatThaiShort(ymdStr)}"
+                class="h-7 rounded-lg border text-xs font-semibold flex items-center justify-center cursor-pointer transition-colors ${btnClass}">
+          ${d}
+        </button>`;
+    }
+
+    grid.innerHTML = html;
+  }
+
+  function pickLeaveCalendarDate(ymdStr) {
+    const lfrEl = document.getElementById('inpLeaveFrom');
+    const ltoEl = document.getElementById('inpLeaveTo');
+
+    if (leavePickerTarget === 'to') {
+      const startStr = lfrEl.value || ymdStr;
+      if (parseDate(ymdStr) < parseDate(startStr)) {
+        lfrEl.value = ymdStr;
+        ltoEl.value = ymdStr;
+      } else {
+        const maxAllowed = addDaysYMD(startStr, MAX_CONSECUTIVE_LEAVE_DAYS - 1);
+        if (parseDate(ymdStr) > parseDate(maxAllowed)) {
+          ltoEl.value = maxAllowed;
+          showToast(`ลาพักร้อนต่อเนื่องได้สูงสุด ${MAX_CONSECUTIVE_LEAVE_DAYS} วัน`);
+        } else {
+          ltoEl.value = ymdStr;
+        }
+      }
+    } else {
+      lfrEl.value = ymdStr;
+      if (!ltoEl.value || parseDate(ltoEl.value) < parseDate(ymdStr)) {
+        ltoEl.value = ymdStr;
+      } else {
+        const maxAllowed = addDaysYMD(ymdStr, MAX_CONSECUTIVE_LEAVE_DAYS - 1);
+        if (parseDate(ltoEl.value) > parseDate(maxAllowed)) {
+          ltoEl.value = maxAllowed;
+        }
+      }
+    }
+
+    syncLeaveDateLabels();
+    closeLeaveCalendarPicker();
+    validateForm();
+  }
+
+  function selectLeavePickerToday() {
+    pickLeaveCalendarDate(TODAY);
+  }
+
+  function clearLeavePickerTarget() {
+    if (leavePickerTarget === 'to') {
+      const startStr = document.getElementById('inpLeaveFrom').value || currentDateKey || TODAY;
+      document.getElementById('inpLeaveTo').value = startStr;
+    } else {
+      document.getElementById('inpLeaveFrom').value = currentDateKey || TODAY;
+      document.getElementById('inpLeaveTo').value = currentDateKey || TODAY;
+    }
+    syncLeaveDateLabels();
+    renderLeavePickerCalendar();
+    validateForm();
+  }
+
+  function openDateFieldPicker(inputId) {
+    toggleLeaveCalendarPicker(inputId === 'inpLeaveTo' ? 'to' : 'from');
+  }
+
+  function validateForm() {
+    const alertBox = document.getElementById('alertBox');
+    const btnSave = document.getElementById('btnSaveEntry');
+    const hint = document.getElementById('progressHint');
+    const heroTitle = document.getElementById('sheetHeroTitle');
+    const heroVal = document.getElementById('sheetHeroValue');
+
+    alertBox.classList.add('hidden');
+    alertBox.textContent = '';
+
+    if (currentMode === 'ot') {
+      const tin = document.getElementById('inpTimeIn').value.trim();
+      const tout = document.getElementById('inpTimeOut').value.trim();
+      const note = document.getElementById('inpWorkNote').value.trim();
+      const validIn = isValid24hTime(tin);
+      const validOut = isValid24hTime(tout);
+      const hrs = (validIn && validOut) ? calcOTHours(tin, tout) : 0;
+
+      heroTitle.textContent = 'ชั่วโมงโอทีสุทธิ';
+      heroVal.textContent = `+${hrs} ชม.`;
+
+      if (!validIn || !validOut) {
+        alertBox.classList.remove('hidden');
+        alertBox.textContent = 'กรุณากรอกเวลาเข้างานและเวลาเลิกงานเป็นรูปแบบ 24 ชม. (HH:MM) เช่น 09:00 และ 20:00';
+      } else if (hrs <= 0) {
+        alertBox.classList.remove('hidden');
+        alertBox.textContent = 'ชั่วโมง OT สุทธิต้องมากกว่า 0 ชม. (เวลาทำงานต้องเกิน 9 ชม. รวมพัก 1 ชม.)';
+      }
+
+      const completed = [validIn && validOut && hrs > 0, Boolean(note), Boolean(currentPhoto)].filter(Boolean).length;
+      hint.textContent = `กรอกข้อมูล OT ครบ ${completed} / 3 ส่วน (เวลาและ OT > 0 · งานที่ทำ · รูปเช็คเอาท์)`;
+      btnSave.textContent = 'ส่งคำขอ OT';
+      btnSave.disabled = !(validIn && validOut && hrs > 0 && note && currentPhoto);
+    } else {
+      const lfr = document.getElementById('inpLeaveFrom').value;
+      const lto = document.getElementById('inpLeaveTo').value;
+      const dayCount = (lfr && lto) ? calcLeaveDays(lfr, lto) : 0;
+      const countBadge = document.getElementById('leaveDaysCountBadge');
+
+      heroTitle.textContent = 'ช่วงวันลาพักร้อน';
+      heroVal.textContent = (lfr && lto) ? `${formatThaiShort(lfr)} – ${formatThaiShort(lto)}` : 'เลือกวันที่ลา';
+
+      if (countBadge) {
+        countBadge.textContent = `เลือกวันลา: ${Math.max(0, dayCount)} / ${MAX_CONSECUTIVE_LEAVE_DAYS} วัน`;
+        countBadge.className = (dayCount > MAX_CONSECUTIVE_LEAVE_DAYS)
+          ? 'text-xs font-bold text-[#ff9aa7]'
+          : 'text-xs font-bold text-[#ffb98a]';
+      }
+
+      if (lfr && lto && parseDate(lto) < parseDate(lfr)) {
+        alertBox.classList.remove('hidden');
+        alertBox.textContent = 'วันที่สิ้นสุดต้องไม่น้อยกว่าวันที่เริ่มลา';
+        hint.textContent = 'กรุณาตรวจสอบช่วงวันที่ลา';
+        btnSave.textContent = 'ส่งคำขอลาพักร้อน';
+        btnSave.disabled = true;
+        return;
+      }
+
+      if (dayCount > MAX_CONSECUTIVE_LEAVE_DAYS) {
+        alertBox.classList.remove('hidden');
+        alertBox.textContent = `ลาพักร้อนต่อเนื่องได้สูงสุด ${MAX_CONSECUTIVE_LEAVE_DAYS} วันติดกัน (คุณเลือก ${dayCount} วัน)`;
+        hint.textContent = `กรุณาเลือกวันลาไม่เกิน ${MAX_CONSECUTIVE_LEAVE_DAYS} วันติดกัน`;
+        btnSave.textContent = 'ส่งคำขอลาพักร้อน';
+        btnSave.disabled = true;
+        return;
+      }
+
+      const overlap = (lfr && lto) ? findLeaveOverlap(lfr, lto) : null;
+      if (overlap) {
+        alertBox.classList.remove('hidden');
+        alertBox.textContent = `ไม่สามารถเลือกวันลาทับซ้อนกับ ${overlap.firstName} ${overlap.lastName} (${overlap.empId}) ช่วง ${formatThaiShort(overlap.from)} – ${formatThaiShort(overlap.to || overlap.from)}`;
+        hint.textContent = 'วันลาชนกับพนักงานคนอื่น กรุณาเปลี่ยนช่วงวันที่';
+        btnSave.textContent = 'ส่งคำขอลาพักร้อน';
+        btnSave.disabled = true;
+        return;
+      }
+
+      const ready = Boolean(lfr && lto && dayCount >= 1 && dayCount <= MAX_CONSECUTIVE_LEAVE_DAYS && !overlap);
+      hint.textContent = ready
+        ? `พร้อมส่งคำขอลาพักร้อน ${dayCount} วัน ไปที่ ${APPROVER_ID} (ไม่ต้องถ่ายรูป)`
+        : 'กรุณาเลือกช่วงวันที่ลาพักร้อน';
+      btnSave.textContent = 'ส่งคำขอลาพักร้อน';
+      btnSave.disabled = !ready;
+    }
+  }
+
+  // --- จัดการรูปเช็คเอาท์และรูปโปรไฟล์ ---
+  function getCheckoutTimeLabel() {
+    const customTime = (document.getElementById('inpCheckoutTime')?.value || '').trim();
+    if (customTime) {
+      return customTime.replace(/\s*น\.$/, '');
+    }
+    const outField = (document.getElementById('inpTimeOut')?.value || '').trim();
+    if (isValid24hTime(outField)) return outField;
+    return new Intl.DateTimeFormat('th-TH', {
+      timeZone: BKK_TZ,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).format(new Date());
+  }
+
+  function getCheckoutLocationLabel() {
+    const loc = (document.getElementById('inpCheckoutLocation')?.value || '').trim();
+    return loc || 'ไม่ได้ระบุสถานที่';
+  }
+
+  function formatTimemarkDate(ymdStr) {
+    const [y, m, d] = (ymdStr || TODAY).split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    return `${TH_DAYS[dt.getUTCDay()]}., ${d} ${TH_SHORT[m - 1]} ${y + 543}`;
+  }
+
+  function wrapCanvasText(ctx, text, x, startY, maxWidth, lineHeight, maxLines) {
+    const words = String(text || '').split(' ');
+    const lines = [];
+    let currentLine = '';
+
+    for (const word of words) {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      if (ctx.measureText(testLine).width <= maxWidth || !currentLine) {
+        currentLine = testLine;
+      } else {
+        lines.push(currentLine);
+        currentLine = word;
+        if (lines.length >= maxLines) break;
+      }
+    }
+    if (currentLine && lines.length < maxLines) {
+      lines.push(currentLine);
+    }
+
+    lines.forEach((line, idx) => {
+      ctx.fillText(line, x, startY + idx * lineHeight);
+    });
+    return lines.length;
+  }
+
+  function stampPhotoWithTimeAndLocation(imgSrc, callback) {
+    if (!imgSrc) {
+      if (callback) callback('');
+      return;
+    }
+    const timeStr = getCheckoutTimeLabel();
+    const locStr = getCheckoutLocationLabel();
+    const dateStr = formatTimemarkDate(currentDateKey || TODAY);
+
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const maxW = 720;
+        const scale = img.width > maxW ? maxW / img.width : 1;
+        const w = Math.max(360, Math.round(img.width * scale));
+        const h = Math.max(240, Math.round(img.height * scale));
+        const c = document.createElement('canvas');
+        c.width = w;
+        c.height = h;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+
+        // แถบไล่ระดับด้านล่างสไตล์ Timemark ให้อ่านตัวอักษรขาวคมชัดบนทุกภาพ
+        const blockH = Math.min(h - 16, Math.max(122, Math.round(h * 0.44)));
+        const blockTop = h - blockH;
+        const grad = ctx.createLinearGradient(0, blockTop - 16, 0, h);
+        grad.addColorStop(0, 'rgba(15, 18, 36, 0)');
+        grad.addColorStop(0.25, 'rgba(15, 18, 36, 0.52)');
+        grad.addColorStop(1, 'rgba(15, 18, 36, 0.84)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, blockTop - 16, w, blockH + 16);
+
+        const leftX = 14;
+        const badgeW = 84;
+        const timeW = Math.min(138, Math.max(106, Math.round(w * 0.28)));
+        const pillH = 32;
+        const pillY = blockTop + 6;
+
+        // ป้ายเวลาสไตล์ Timemark: [เช็กเอาท์] [16:24]
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.roundRect(leftX, pillY, badgeW + timeW, pillH, 7);
+        ctx.fill();
+
+        ctx.fillStyle = '#f5a623';
+        ctx.beginPath();
+        ctx.roundRect(leftX + 2, pillY + 2, badgeW - 2, pillH - 4, 5);
+        ctx.fill();
+
+        ctx.fillStyle = '#19143c';
+        ctx.font = 'bold 13px Prompt, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('เช็กเอาท์', leftX + 2 + (badgeW - 2) / 2, pillY + pillH / 2 + 0.5);
+
+        ctx.fillStyle = '#0c2340';
+        ctx.font = '800 20px Prompt, sans-serif';
+        ctx.fillText(timeStr, leftX + badgeW + timeW / 2, pillY + pillH / 2 + 1);
+
+        // เส้นแถบสีเหลืองด้านซ้ายของข้อความที่อยู่/เวลา
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        const infoTop = pillY + pillH + 7;
+        const footerH = 22;
+        const infoBottom = h - footerH - 6;
+        ctx.fillStyle = '#f5a623';
+        ctx.fillRect(leftX, infoTop + 2, 3.5, Math.max(24, infoBottom - infoTop - 2));
+
+        const textX = leftX + 10;
+        const maxTextW = w - textX - 12;
+
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+        ctx.shadowBlur = 4;
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '700 14px Prompt, sans-serif';
+        ctx.fillText(dateStr, textX, infoTop);
+
+        ctx.font = '600 13px Prompt, sans-serif';
+        wrapCanvasText(ctx, locStr, textX, infoTop + 20, maxTextW, 16, 2);
+        ctx.shadowBlur = 0;
+
+        // แถบรับรองเวลาและสถานที่ด้านล่างสุด
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.font = '600 11px Prompt, sans-serif';
+        ctx.fillText(`🛡️ oto Timestamp · รับรองเวลาและสถานที่เช็คเอาท์`, leftX, h - footerH);
+
+        if (callback) callback(c.toDataURL('image/jpeg', 0.9));
+      } catch (err) {
+        if (callback) callback(imgSrc);
+      }
+    };
+    img.onerror = () => {
+      if (callback) callback(imgSrc);
+    };
+    img.src = imgSrc;
+  }
+
+  function applyCheckoutPhotoSource(srcDataUrl, toastMsg) {
+    rawCheckoutSourcePhoto = srcDataUrl;
+    stampPhotoWithTimeAndLocation(srcDataUrl, (stampedUrl) => {
+      currentPhoto = stampedUrl;
+      const preview = document.getElementById('photoPreview');
+      preview.src = currentPhoto;
+      preview.classList.remove('hidden');
+      document.getElementById('btnClearPhoto').classList.remove('hidden');
+      validateForm();
+      if (toastMsg) showToast(toastMsg);
+    });
+  }
+
+  function onCheckoutMetaChange() {
+    if (rawCheckoutSourcePhoto) {
+      stampPhotoWithTimeAndLocation(rawCheckoutSourcePhoto, (stampedUrl) => {
+        currentPhoto = stampedUrl;
+        const preview = document.getElementById('photoPreview');
+        if (preview && currentPhoto) {
+          preview.src = currentPhoto;
+        }
+        validateForm();
+      });
+    } else {
+      validateForm();
+    }
+  }
+
+  function detectCheckoutLocation() {
+    const locInput = document.getElementById('inpCheckoutLocation');
+    const statusEl = document.getElementById('checkoutGeoStatus');
+    if (statusEl) statusEl.textContent = 'กำลังขอสิทธิ์และดึงพิกัด GPS...';
+
+    if (!navigator.geolocation) {
+      if (locInput && !locInput.value.trim()) locInput.value = 'จุดเช็คเอาท์ที่ทำงาน';
+      if (statusEl) statusEl.textContent = 'เบราว์เซอร์ไม่รองรับ GPS พิมพ์สถานที่เองได้เลย';
+      onCheckoutMetaChange();
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude.toFixed(6);
+        const lng = pos.coords.longitude.toFixed(6);
+        let placeLabel = `GPS: ${lat}, ${lng}`;
+
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=th`, {
+            headers: { 'Accept': 'application/json' }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.display_name) {
+              placeLabel = data.display_name;
+            }
+          }
+        } catch (err) {
+          // ใช้พิกัด GPS สำรองเมื่อไม่มีอินเทอร์เน็ตหรือถูกบล็อก
+        }
+
+        if (locInput) {
+          locInput.value = placeLabel;
+        }
+        if (statusEl) statusEl.textContent = `✓ รับพิกัด GPS แล้ว (${lat}, ${lng})`;
+        onCheckoutMetaChange();
+        showToast('รับพิกัด GPS และระบุสถานที่บนรูปแล้ว ✓');
+      },
+      () => {
+        if (locInput && !locInput.value.trim()) locInput.value = 'สถานที่ปฏิบัติงาน';
+        if (statusEl) statusEl.textContent = 'ไม่ได้รับสิทธิ์ GPS · กรุณาอนุญาต GPS หรือพิมพ์สถานที่เอง';
+        onCheckoutMetaChange();
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+    );
+  }
+
+  async function openPhoneCamera() {
+    const timeInput = document.getElementById('inpCheckoutTime');
+    if (timeInput && !timeInput.value.trim()) {
+      timeInput.value = getBangkokLiveClock();
+    }
+    const locInput = document.getElementById('inpCheckoutLocation');
+    if (locInput && !locInput.value.trim()) {
+      detectCheckoutLocation();
+    }
+
+    const camBox = document.getElementById('liveCameraBox');
+    const videoEl = document.getElementById('liveCameraVideo');
+
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia && camBox && videoEl) {
+      try {
+        stopLiveCamera();
+        liveCameraStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } },
+          audio: false
+        });
+        videoEl.srcObject = liveCameraStream;
+        camBox.classList.remove('hidden');
+        showToast('เปิดกล้องถ่ายรูปเช็คเอาท์แล้ว 📸');
+        return;
+      } catch (err) {
+        // หากเปิดกล้องสดไม่ได้ ให้เปิดกล้องเนทีฟของโทรศัพท์ผ่าน input[capture]
+      }
+    }
+
+    const fallbackInput = document.getElementById('cameraCaptureInput');
+    if (fallbackInput) fallbackInput.click();
+  }
+
+  function captureFromLiveCamera() {
+    const videoEl = document.getElementById('liveCameraVideo');
+    if (!videoEl || !videoEl.videoWidth) {
+      showToast('กล้องยังไม่พร้อม ลองใหม่อีกครั้งครับ');
+      return;
+    }
+    const c = document.createElement('canvas');
+    c.width = videoEl.videoWidth;
+    c.height = videoEl.videoHeight;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(videoEl, 0, 0, c.width, c.height);
+    const shotUrl = c.toDataURL('image/jpeg', 0.9);
+    stopLiveCamera();
+    applyCheckoutPhotoSource(shotUrl, 'ถ่ายรูปเช็คเอาท์พร้อมระบุเวลาและสถานที่แล้ว ✓');
+  }
+
+  function stopLiveCamera() {
+    if (liveCameraStream) {
+      liveCameraStream.getTracks().forEach(t => t.stop());
+      liveCameraStream = null;
+    }
+    const camBox = document.getElementById('liveCameraBox');
+    const videoEl = document.getElementById('liveCameraVideo');
+    if (videoEl) videoEl.srcObject = null;
+    if (camBox) camBox.classList.add('hidden');
+  }
+
+  document.getElementById('cameraCaptureInput').addEventListener('change', e => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      applyCheckoutPhotoSource(ev.target.result, 'ถ่ายรูปจากกล้องโทรศัพท์พร้อมระบุเวลาและสถานที่แล้ว ✓');
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  });
+
+  document.getElementById('fileUpload').addEventListener('change', e => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      applyCheckoutPhotoSource(ev.target.result, 'อัปโหลดรูปหลักฐานเช็คเอาท์และระบุเวลา/สถานที่แล้ว ✓');
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  });
+
+  function clearProfilePhoto() {
+    if (state.user) {
+      state.user.avatar = '';
+      const empKey = (state.user.empId || '').trim().toUpperCase();
+      if (registeredAccounts[empKey]) {
+        registeredAccounts[empKey].avatar = '';
+        window.cloudStore?.saveAccount(registeredAccounts[empKey]);
+      }
+    }
+    renderApp();
+    showToast('ลบรูปโปรไฟล์และกลับไปใช้รูปการ์ตูนแล้ว');
+  }
+
+  document.getElementById('profilePhotoUpload').addEventListener('change', e => {
+    const file = e.target.files?.[0];
+    if (!file || !state.user) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const dataUrl = ev.target.result;
+      state.user.avatar = dataUrl;
+      const empKey = (state.user.empId || '').trim().toUpperCase();
+      if (registeredAccounts[empKey]) {
+        registeredAccounts[empKey].avatar = dataUrl;
+        window.cloudStore?.saveAccount(registeredAccounts[empKey]);
+      }
+      renderApp();
+      showToast('อัปเดตรูปโปรไฟล์เรียบร้อยแล้ว ✓');
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  });
+
+  function clearPhoto() {
+    currentPhoto = '';
+    rawCheckoutSourcePhoto = '';
+    const preview = document.getElementById('photoPreview');
+    if (preview) {
+      preview.src = '';
+      preview.classList.add('hidden');
+    }
+    const btnClear = document.getElementById('btnClearPhoto');
+    if (btnClear) btnClear.classList.add('hidden');
+    validateForm();
+  }
+
+  function saveCurrentEntry() {
+    if (!currentDateKey || isManager()) return;
+    const existingCosmic = state.items[currentDateKey]?.cosmicIcon ?? getRandomCosmicIndex();
+
+    if (currentMode === 'ot') {
+      const tin = document.getElementById('inpTimeIn').value.trim();
+      const tout = document.getElementById('inpTimeOut').value.trim();
+      const note = document.getElementById('inpWorkNote').value.trim();
+      const hrs = calcOTHours(tin, tout);
+      if (!isValid24hTime(tin) || !isValid24hTime(tout) || hrs <= 0 || !note || !currentPhoto) {
+        validateForm();
+        return;
+      }
+
+      state.items[currentDateKey] = {
+        type: 'ot',
+        empId: state.user.empId,
+        timeIn: tin,
+        timeOut: tout,
+        checkoutTime: getCheckoutTimeLabel(),
+        checkoutLocation: getCheckoutLocationLabel(),
+        note,
+        photo: currentPhoto,
+        mood: currentMood,
+        cosmicIcon: existingCosmic,
+        approverId: APPROVER_ID,
+        status: 'submitted'
+      };
+      window.cloudStore?.saveCalendarItem(currentDateKey, state.items[currentDateKey]);
+
+      const newOtReq = {
+        id: 'req-' + Date.now(),
+        firstName: state.user.firstName,
+        lastName: state.user.lastName,
+        empId: state.user.empId,
+        approverId: APPROVER_ID,
+        type: 'ot',
+        from: currentDateKey,
+        to: currentDateKey,
+        timeIn: tin,
+        timeOut: tout,
+        checkoutTime: getCheckoutTimeLabel(),
+        checkoutLocation: getCheckoutLocationLabel(),
+        hours: hrs,
+        note,
+        photo: currentPhoto,
+        status: 'submitted'
+      };
+      state.teamRequests.unshift(newOtReq);
+      window.cloudStore?.saveRequest(newOtReq);
+
+      showToast(`ส่งคำขอ OT +${hrs} ชม. ไปที่ ${APPROVER_ID} แล้ว`);
+    } else {
+      const lfr = document.getElementById('inpLeaveFrom').value;
+      const lto = document.getElementById('inpLeaveTo').value;
+      const dayCount = calcLeaveDays(lfr, lto);
+      if (!lfr || !lto || parseDate(lto) < parseDate(lfr) || dayCount > MAX_CONSECUTIVE_LEAVE_DAYS || findLeaveOverlap(lfr, lto)) {
+        validateForm();
+        return;
+      }
+
+      state.items[lfr] = {
+        type: 'leave',
+        empId: state.user.empId,
+        to: lto,
+        mood: currentMood,
+        cosmicIcon: existingCosmic,
+        approverId: APPROVER_ID,
+        status: 'submitted'
+      };
+      window.cloudStore?.saveCalendarItem(lfr, state.items[lfr]);
+
+      const owner = state.user || { firstName: 'พนักงาน', lastName: '', empId: 'EMP-0231' };
+      const newLeaveReq = {
+        id: 'req-' + Date.now(),
+        firstName: owner.firstName,
+        lastName: owner.lastName,
+        empId: owner.empId,
+        approverId: APPROVER_ID,
+        type: 'leave',
+        from: lfr,
+        to: lto,
+        note: 'ลาพักร้อน',
+        status: 'submitted'
+      };
+      state.teamRequests.unshift(newLeaveReq);
+      window.cloudStore?.saveRequest(newLeaveReq);
+
+      showToast(`ส่งคำขอลาพักร้อนของ ${owner.firstName} (${formatThaiShort(lfr)} – ${formatThaiShort(lto)}) ไปที่ ${APPROVER_ID} แล้ว`);
+    }
+
+    closeDaySheet();
+  }
+
+  function deleteCurrentEntry() {
+    if (!currentDateKey || !state.items[currentDateKey]) return;
+    const empId = state.items[currentDateKey].empId || state.user?.empId;
+    delete state.items[currentDateKey];
+    window.cloudStore?.deleteCalendarItem(empId, currentDateKey);
+    showToast('ลบรายการเรียบร้อยแล้ว');
+    closeDaySheet();
+  }
+
+  // อัปเดตนาฬิกาเวลาไทยทุกวินาที
+  setInterval(() => {
+    const nowStr = getBangkokLiveClock();
+    const headerClock = document.getElementById('liveBkkClock');
+    const sheetClock = document.getElementById('sheetLiveClock');
+    if (headerClock) headerClock.textContent = nowStr;
+    if (sheetClock) sheetClock.textContent = nowStr;
+  }, 1000);
+
+  // --- รองรับการติดตั้งเป็นแอป (PWA Manifest + Install Prompt) ---
+  let deferredInstallPrompt = null;
+
+  function createAppIconDataUrl(size) {
+    const c = document.createElement('canvas');
+    c.width = size;
+    c.height = size;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#19143c';
+    ctx.fillRect(0, 0, size, size);
+
+    const padBox = Math.round(size * 0.12);
+    ctx.fillStyle = '#ffb98a';
+    ctx.beginPath();
+    ctx.roundRect(padBox, padBox, size - padBox * 2, size - padBox * 2, Math.round(size * 0.22));
+    ctx.fill();
+
+    ctx.fillStyle = '#19143c';
+    ctx.font = `bold ${Math.round(size * 0.34)}px Prompt, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('oto', size / 2, size / 2 + Math.round(size * 0.02));
+    return c.toDataURL('image/png');
+  }
+
+  function setupPwaManifest() {
+    try {
+      const icon192 = createAppIconDataUrl(192);
+      const icon512 = createAppIconDataUrl(512);
+      const appleLink = document.getElementById('pwaAppleIconLink');
+      if (appleLink) appleLink.href = icon192;
+
+      const manifest = {
+        name: 'oto – เช็คอิน บันทึกโอที ลาพักร้อน',
+        short_name: 'oto',
+        description: 'แอปบันทึกชั่วโมงโอที ลาพักร้อน และอนุมัติคำขอ',
+        start_url: './',
+        display: 'standalone',
+        background_color: '#19143c',
+        theme_color: '#19143c',
+        icons: [
+          { src: icon192, sizes: '192x192', type: 'image/png' },
+          { src: icon512, sizes: '512x512', type: 'image/png' }
+        ]
+      };
+      const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+      const manifestUrl = URL.createObjectURL(blob);
+      const manifestLink = document.getElementById('pwaManifestLink');
+      if (manifestLink) manifestLink.href = manifestUrl;
+    } catch (err) {
+      // ข้ามหากเบราว์เซอร์ไม่อนุญาตสร้าง Blob manifest
+    }
+  }
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+  });
+
+  async function triggerInstallApp() {
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      const choice = await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+      if (choice.outcome === 'accepted') {
+        showToast('กำลังติดตั้งแอป oto ลงเครื่องของคุณ ✓');
+      }
+      return;
+    }
+    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    if (isIos) {
+      showToast('บน iPhone/iPad: กดปุ่ม Share (□↑) แล้วเลือก "Add to Home Screen"');
+    } else {
+      showToast('กดเมนูมุมขวาบนของเบราว์เซอร์ (⋮) แล้วเลือก "Install app" หรือ "Add to Home screen"');
+    }
+  }
+
+  setupPwaManifest();
+
+  // เริ่มต้นทำงาน
+  renderApp();
+</script>
+</body>
+</html>
