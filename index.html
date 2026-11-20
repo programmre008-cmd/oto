@@ -489,26 +489,28 @@
   <div class="toast-pill" id="toastPill"></div>
 </div>
 
-<!-- Cross-Device Centralized Cloud Database Sync -->
+<!-- Fast Event + Snapshot Cross-Device Cloud Sync -->
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
   import { getAuth, signInAnonymously, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
   import { getFirestore, doc, setDoc, deleteDoc, collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
   const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-  const appId = typeof __app_id !== 'undefined' ? __app_id : 'oto-ot-leave-shared-v8';
+  const appId = typeof __app_id !== 'undefined' ? __app_id : 'oto-ot-leave-shared-v9';
 
-  const DEFAULT_SHARED_BLOB_URL = 'https://api.jsonstorage.net/v1/json/4e9a7c2b-8f13-4d6e-9a21-7b3c5d8e0f12/oto-team-v8';
-  const CUSTOM_DB_STORAGE_KEY = 'oto_central_blob_url_v8';
-  const NTFY_TOPIC_URL = 'https://ntfy.sh/oto_team_sync_sm2080797_v8';
+  const CUSTOM_DB_STORAGE_KEY = 'oto_central_blob_url_v9';
+  const NTFY_BASE_URL = 'https://ntfy.sh';
+  const NTFY_SNAPSHOT_TOPIC = 'oto_team_snap_sm2080797_v9';
+  const NTFY_EVENTS_TOPIC = 'oto_team_live_sm2080797_v9';
 
   let isSyncingNow = false;
   let lastCloudPushAt = 0;
   let activeCloudUrl = '';
-  let lastSyncFingerprint = '';
   let consecutiveFailures = 0;
-  let ntfyEventSource = null;
+  let snapEventSource = null;
+  let liveEventSource = null;
   let pendingPushTimer = null;
+  let seenEventIds = new Set();
 
   function resolveCloudUrl() {
     const custom = (localStorage.getItem(CUSTOM_DB_STORAGE_KEY) || '').trim();
@@ -516,64 +518,129 @@
       activeCloudUrl = custom;
       return custom;
     }
-    activeCloudUrl = DEFAULT_SHARED_BLOB_URL;
-    return DEFAULT_SHARED_BLOB_URL;
+    activeCloudUrl = `${NTFY_BASE_URL}/${NTFY_SNAPSHOT_TOPIC}`;
+    return activeCloudUrl;
   }
 
-  function applyIncomingPayload(parsed) {
-    if (!parsed || typeof parsed !== 'object') return false;
-    if (!parsed.accounts && !parsed.requests && !parsed.calendar && !parsed.tombstones) return false;
-    const remoteFp = JSON.stringify({
-      a: Object.keys(parsed.accounts || {}).sort(),
-      r: (parsed.requests || []).map(x => `${x.id}:${x.status}:${x.updatedAt || 0}`).sort(),
-      c: (parsed.calendar || []).map(x => `${x.empId || ''}:${x.dateKey}:${x.type}`).sort(),
-      t: parsed.tombstones || {}
-    });
-    let hadDiff = false;
-    if (typeof window.mergeCloudSnapshot === 'function') {
-      hadDiff = window.mergeCloudSnapshot(parsed);
-    }
-    if (hadDiff && remoteFp !== lastSyncFingerprint) {
-      lastSyncFingerprint = remoteFp;
-      scheduleDebouncedPush();
-    } else {
-      lastSyncFingerprint = remoteFp;
-    }
-    return true;
+  function compactImageForCloud(dataUrl, maxLen = 22000) {
+    if (!dataUrl || typeof dataUrl !== 'string') return '';
+    if (dataUrl.length <= maxLen) return dataUrl;
+    return '';
   }
 
-  function connectNtfyRealtimeStream() {
-    if (ntfyEventSource) {
-      try { ntfyEventSource.close(); } catch (e) {}
-      ntfyEventSource = null;
-    }
-    try {
-      const es = new EventSource(`${NTFY_TOPIC_URL}/sse?since=12h`);
-      ntfyEventSource = es;
-      es.onopen = () => {
-        consecutiveFailures = 0;
-        setCloudBadge('ออนไลน์ · เชื่อมต่อเสถียร ✓', true);
+  function buildCompactSnapshot() {
+    const stateObj = window.getAppSyncSnapshot ? window.getAppSyncSnapshot() : {
+      accounts: {},
+      requests: [],
+      calendar: [],
+      tombstones: { accounts: [], requests: [], calendar: [] }
+    };
+
+    const compactAccounts = {};
+    Object.entries(stateObj.accounts || {}).forEach(([k, acc]) => {
+      if (!acc) return;
+      compactAccounts[k] = {
+        ...acc,
+        avatarPhoto: compactImageForCloud(acc.avatarPhoto, 20000)
       };
-      es.onmessage = (event) => {
+    });
+
+    const compactRequests = (stateObj.requests || []).slice(0, 80).map(r => ({
+      ...r,
+      photo: compactImageForCloud(r.photo, 24000)
+    }));
+
+    const compactCalendar = (stateObj.calendar || []).slice(0, 120).map(c => ({
+      ...c,
+      photo: compactImageForCloud(c.photo, 18000)
+    }));
+
+    return {
+      kind: 'snapshot',
+      updatedAt: Date.now(),
+      accounts: compactAccounts,
+      requests: compactRequests,
+      calendar: compactCalendar,
+      tombstones: stateObj.tombstones || { accounts: [], requests: [], calendar: [] }
+    };
+  }
+
+  function handleIncomingMessageObj(parsed) {
+    if (!parsed || typeof parsed !== 'object') return false;
+    if (parsed.eventId) {
+      if (seenEventIds.has(parsed.eventId)) return false;
+      seenEventIds.add(parsed.eventId);
+      if (seenEventIds.size > 400) {
+        const arr = Array.from(seenEventIds).slice(-200);
+        seenEventIds = new Set(arr);
+      }
+    }
+
+    if (parsed.kind === 'event' && typeof window.applyLiveEvent === 'function') {
+      return window.applyLiveEvent(parsed);
+    }
+
+    if (parsed.accounts || parsed.requests || parsed.calendar || parsed.tombstones) {
+      if (typeof window.mergeCloudSnapshot === 'function') {
+        return window.mergeCloudSnapshot(parsed);
+      }
+    }
+    return false;
+  }
+
+  function connectRealtimeStreams() {
+    if (snapEventSource) {
+      try { snapEventSource.close(); } catch (e) {}
+      snapEventSource = null;
+    }
+    if (liveEventSource) {
+      try { liveEventSource.close(); } catch (e) {}
+      liveEventSource = null;
+    }
+
+    try {
+      const esLive = new EventSource(`${NTFY_BASE_URL}/${NTFY_EVENTS_TOPIC}/sse?since=6h`);
+      liveEventSource = esLive;
+      esLive.onopen = () => {
         consecutiveFailures = 0;
-        setCloudBadge('ออนไลน์ · เชื่อมต่อเสถียร ✓', true);
+        setCloudBadge('ออนไลน์ · ซิงค์ไว ✓', true);
+      };
+      esLive.onmessage = (event) => {
+        consecutiveFailures = 0;
+        setCloudBadge('ออนไลน์ · ซิงค์ไว ✓', true);
         try {
           const evt = JSON.parse(event.data);
           if (evt && evt.message) {
             const parsed = JSON.parse(evt.message);
-            applyIncomingPayload(parsed);
+            handleIncomingMessageObj(parsed);
           }
         } catch (e) {}
       };
-      es.onerror = () => {};
+      esLive.onerror = () => {};
+    } catch (e) {}
+
+    try {
+      const esSnap = new EventSource(`${NTFY_BASE_URL}/${NTFY_SNAPSHOT_TOPIC}/sse?since=24h`);
+      snapEventSource = esSnap;
+      esSnap.onmessage = (event) => {
+        consecutiveFailures = 0;
+        try {
+          const evt = JSON.parse(event.data);
+          if (evt && evt.message) {
+            const parsed = JSON.parse(evt.message);
+            handleIncomingMessageObj(parsed);
+          }
+        } catch (e) {}
+      };
+      esSnap.onerror = () => {};
     } catch (e) {}
   }
 
-  async function readFromNtfyRelay() {
+  async function pollTopicLines(topicUrl) {
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 7500);
-      const res = await fetch(`${NTFY_TOPIC_URL}/json?poll=1&since=24h`, {
+      const timer = setTimeout(() => controller.abort(), 5000);
+      const res = await fetch(`${topicUrl}/json?poll=1&since=24h`, {
         method: 'GET',
         cache: 'no-store',
         signal: controller.signal
@@ -581,35 +648,32 @@
       clearTimeout(timer);
       if (!res.ok) return null;
       const text = await res.text();
-      if (!text.trim()) return { ok: true, data: null };
+      if (!text.trim()) return [];
       const lines = text.trim().split('\n');
-      let latestPayload = null;
-      for (let i = lines.length - 1; i >= 0; i--) {
+      const items = [];
+      for (let i = 0; i < lines.length; i++) {
         try {
           const evt = JSON.parse(lines[i]);
           if (evt && evt.message) {
             const parsed = JSON.parse(evt.message);
-            if (parsed && typeof parsed === 'object' && (parsed.accounts || parsed.requests || parsed.calendar)) {
-              latestPayload = parsed;
-              break;
-            }
+            if (parsed && typeof parsed === 'object') items.push(parsed);
           }
         } catch (e) {}
       }
-      return { ok: true, data: latestPayload };
+      return items;
     } catch (e) {
       return null;
     }
   }
 
-  async function writeToNtfyRelay(payload) {
+  async function postToTopic(topicUrl, payloadObj) {
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 8000);
-      const res = await fetch(NTFY_TOPIC_URL, {
+      const timer = setTimeout(() => controller.abort(), 6000);
+      const res = await fetch(topicUrl, {
         method: 'POST',
-        headers: { 'Title': 'oto_sync' },
-        body: JSON.stringify(payload),
+        headers: { 'Title': 'oto_live' },
+        body: JSON.stringify(payloadObj),
         signal: controller.signal
       });
       clearTimeout(timer);
@@ -617,57 +681,6 @@
     } catch (e) {
       return false;
     }
-  }
-
-  async function readCentralCloudState() {
-    const targetUrl = resolveCloudUrl();
-    const hasCustom = Boolean((localStorage.getItem(CUSTOM_DB_STORAGE_KEY) || '').trim());
-
-    if (hasCustom) {
-      try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 7500);
-        const res = await fetch(targetUrl, { method: 'GET', cache: 'no-store', signal: controller.signal });
-        clearTimeout(timer);
-        if (res.ok) {
-          const data = await res.json();
-          if (data && typeof data === 'object') return { ok: true, data };
-        }
-      } catch (e) {}
-    }
-
-    const ntfyRes = await readFromNtfyRelay();
-    if (ntfyRes && ntfyRes.ok) {
-      return { ok: true, data: ntfyRes.data || { accounts: {}, requests: [], calendar: [], tombstones: {} } };
-    }
-
-    return { ok: false, data: null };
-  }
-
-  async function writeCentralCloudState(payload) {
-    const targetUrl = resolveCloudUrl();
-    const hasCustom = Boolean((localStorage.getItem(CUSTOM_DB_STORAGE_KEY) || '').trim());
-    const tasks = [];
-
-    if (hasCustom) {
-      tasks.push(
-        fetch(targetUrl, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        }).then(r => r.ok).catch(() => false)
-      );
-    }
-
-    tasks.push(writeToNtfyRelay(payload));
-    const results = await Promise.all(tasks);
-    return results.some(Boolean);
-  }
-
-  function compactImageForCloud(dataUrl, maxLen = 26000) {
-    if (!dataUrl || typeof dataUrl !== 'string') return '';
-    if (dataUrl.length <= maxLen) return dataUrl;
-    return '';
   }
 
   function setCloudBadge(text, isOnline) {
@@ -685,11 +698,11 @@
     }
   }
 
-  function scheduleDebouncedPush() {
+  function scheduleDebouncedSnapshotPush() {
     clearTimeout(pendingPushTimer);
     pendingPushTimer = setTimeout(() => {
       if (window.cloudStore) window.cloudStore.pushFullSnapshot();
-    }, 900);
+    }, 350);
   }
 
   let db = null;
@@ -717,50 +730,54 @@
       await window.cloudStore.pullFromCloud(true);
     },
 
-    buildLocalSnapshot: () => {
-      const stateObj = window.getAppSyncSnapshot ? window.getAppSyncSnapshot() : {
-        accounts: {},
-        requests: [],
-        calendar: [],
-        tombstones: { accounts: [], requests: [], calendar: [] }
-      };
+    buildLocalSnapshot: buildCompactSnapshot,
 
-      const compactAccounts = {};
-      Object.entries(stateObj.accounts || {}).forEach(([k, acc]) => {
-        if (!acc) return;
-        compactAccounts[k] = {
-          ...acc,
-          avatarPhoto: compactImageForCloud(acc.avatarPhoto, 25000)
-        };
-      });
+    emitLiveEvent: async (action, data) => {
+      const evtId = `${action}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      seenEventIds.add(evtId);
+      const compactData = { ...data };
+      if (compactData.photo) compactData.photo = compactImageForCloud(compactData.photo, 24000);
+      if (compactData.avatarPhoto) compactData.avatarPhoto = compactImageForCloud(compactData.avatarPhoto, 20000);
 
-      const compactRequests = (stateObj.requests || []).map(r => ({
-        ...r,
-        photo: compactImageForCloud(r.photo, 28000)
-      }));
-
-      const compactCalendar = (stateObj.calendar || []).map(c => ({
-        ...c,
-        photo: compactImageForCloud(c.photo, 22000)
-      }));
-
-      return {
+      const payload = {
+        kind: 'event',
+        eventId: evtId,
+        action,
         updatedAt: Date.now(),
-        accounts: compactAccounts,
-        requests: compactRequests,
-        calendar: compactCalendar,
-        tombstones: stateObj.tombstones || { accounts: [], requests: [], calendar: [] }
+        data: compactData
       };
+      lastCloudPushAt = Date.now();
+      const ok = await postToTopic(`${NTFY_BASE_URL}/${NTFY_EVENTS_TOPIC}`, payload);
+      if (ok) {
+        consecutiveFailures = 0;
+        setCloudBadge('ออนไลน์ · ซิงค์ไว ✓', true);
+      }
+      scheduleDebouncedSnapshotPush();
+      return ok;
     },
 
     pushFullSnapshot: async () => {
       try {
         lastCloudPushAt = Date.now();
-        const payload = window.cloudStore.buildLocalSnapshot();
-        const ok = await writeCentralCloudState(payload);
+        const payload = buildCompactSnapshot();
+        const customUrl = (localStorage.getItem(CUSTOM_DB_STORAGE_KEY) || '').trim();
+        const tasks = [postToTopic(`${NTFY_BASE_URL}/${NTFY_SNAPSHOT_TOPIC}`, payload)];
+
+        if (customUrl && customUrl.startsWith('http')) {
+          tasks.push(
+            fetch(customUrl, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            }).then(r => r.ok).catch(() => false)
+          );
+        }
+
+        const results = await Promise.all(tasks);
+        const ok = results.some(Boolean);
         if (ok) {
           consecutiveFailures = 0;
-          setCloudBadge('ออนไลน์ · เชื่อมต่อเสถียร ✓', true);
+          setCloudBadge('ออนไลน์ · ซิงค์ไว ✓', true);
         } else {
           consecutiveFailures += 1;
           if (consecutiveFailures >= 4 || !navigator.onLine) {
@@ -785,22 +802,48 @@
       }
       isSyncingNow = true;
       try {
-        const res = await readCentralCloudState();
-        if (!res.ok) {
+        const customUrl = (localStorage.getItem(CUSTOM_DB_STORAGE_KEY) || '').trim();
+        const [liveItems, snapItems] = await Promise.all([
+          pollTopicLines(`${NTFY_BASE_URL}/${NTFY_EVENTS_TOPIC}`),
+          pollTopicLines(`${NTFY_BASE_URL}/${NTFY_SNAPSHOT_TOPIC}`)
+        ]);
+
+        let customSnap = null;
+        if (customUrl && customUrl.startsWith('http')) {
+          try {
+            const cRes = await fetch(customUrl, { method: 'GET', cache: 'no-store' });
+            if (cRes.ok) customSnap = await cRes.json();
+          } catch (e) {}
+        }
+
+        if (liveItems === null && snapItems === null && !customSnap) {
           consecutiveFailures += 1;
           if (consecutiveFailures >= 4) {
             setCloudBadge('ออฟไลน์ (กำลังลองเชื่อมต่อใหม่...)', false);
           }
           return false;
         }
-        consecutiveFailures = 0;
-        const remote = res.data || {};
-        setCloudBadge('ออนไลน์ · เชื่อมต่อเสถียร ✓', true);
 
-        applyIncomingPayload(remote);
+        consecutiveFailures = 0;
+        setCloudBadge('ออนไลน์ · ซิงค์ไว ✓', true);
+
+        if (customSnap && typeof customSnap === 'object') {
+          handleIncomingMessageObj(customSnap);
+        }
+
+        if (Array.isArray(snapItems) && snapItems.length > 0) {
+          const latestSnap = snapItems[snapItems.length - 1];
+          handleIncomingMessageObj(latestSnap);
+        }
+
+        if (Array.isArray(liveItems) && liveItems.length > 0) {
+          for (const item of liveItems) {
+            handleIncomingMessageObj(item);
+          }
+        }
 
         if (showNotification && typeof window.showToast === 'function') {
-          window.showToast('☁️ ซิงค์ข้อมูลล่าสุดจากฐานข้อมูลกลางเรียบร้อย');
+          window.showToast('☁️ ซิงค์ข้อมูลล่าสุดเรียบร้อยแล้ว');
         }
         return true;
       } catch (e) {
@@ -821,7 +864,7 @@
           await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'oto_accounts', acc.empId.toUpperCase()), safeFirestorePayload(acc));
         } catch (e) {}
       }
-      await window.cloudStore.pushFullSnapshot();
+      await window.cloudStore.emitLiveEvent('upsert_account', acc);
     },
 
     deleteAccount: async (empId) => {
@@ -831,7 +874,7 @@
           await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'oto_accounts', empId.toUpperCase()));
         } catch (e) {}
       }
-      await window.cloudStore.pushFullSnapshot();
+      await window.cloudStore.emitLiveEvent('delete_account', { empId: empId.toUpperCase() });
     },
 
     saveRequest: async (req) => {
@@ -841,7 +884,7 @@
           await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'oto_requests', req.id), safeFirestorePayload(req));
         } catch (e) {}
       }
-      await window.cloudStore.pushFullSnapshot();
+      await window.cloudStore.emitLiveEvent('upsert_request', req);
     },
 
     deleteRequest: async (reqId) => {
@@ -851,7 +894,7 @@
           await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'oto_requests', reqId));
         } catch (e) {}
       }
-      await window.cloudStore.pushFullSnapshot();
+      await window.cloudStore.emitLiveEvent('delete_request', { id: reqId });
     },
 
     saveCalendarItem: async (item) => {
@@ -862,7 +905,7 @@
           await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'oto_calendar', docId), safeFirestorePayload({ ...item, docId }));
         } catch (e) {}
       }
-      await window.cloudStore.pushFullSnapshot();
+      await window.cloudStore.emitLiveEvent('upsert_calendar', item);
     },
 
     deleteCalendarItem: async (empId, dateKey) => {
@@ -873,23 +916,23 @@
           await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'oto_calendar', docId));
         } catch (e) {}
       }
-      await window.cloudStore.pushFullSnapshot();
+      await window.cloudStore.emitLiveEvent('delete_calendar', { empId: (empId || '').toUpperCase(), dateKey });
     }
   };
 
   async function initCloudDatabase() {
-    connectNtfyRealtimeStream();
+    connectRealtimeStreams();
     await window.cloudStore.pullFromCloud(false);
 
     setInterval(() => {
-      if (Date.now() - lastCloudPushAt > 3000) {
+      if (Date.now() - lastCloudPushAt > 1500) {
         window.cloudStore.pullFromCloud(false);
       }
-    }, 6500);
+    }, 2500);
 
     window.addEventListener('online', () => {
       consecutiveFailures = 0;
-      connectNtfyRealtimeStream();
+      connectRealtimeStreams();
       window.cloudStore.pullFromCloud(false);
     });
 
@@ -899,7 +942,7 @@
 
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) {
-        connectNtfyRealtimeStream();
+        connectRealtimeStreams();
         window.cloudStore.pullFromCloud(false);
       }
     });
@@ -1003,12 +1046,12 @@
   // Local Storage & Sync State Management
   // =========================================================================
   const LS_KEYS = {
-    accounts: 'oto_accounts_v8',
-    requests: 'oto_requests_v8',
-    calendar: 'oto_calendar_v8',
-    tombstones: 'oto_tombstones_v8',
-    session: 'oto_session_v8',
-    smPass: 'oto_sm_pass_v8'
+    accounts: 'oto_accounts_v9',
+    requests: 'oto_requests_v9',
+    calendar: 'oto_calendar_v9',
+    tombstones: 'oto_tombstones_v9',
+    session: 'oto_session_v9',
+    smPass: 'oto_sm_pass_v9'
   };
 
   function safeJsonParse(str, fallback) {
@@ -1055,6 +1098,40 @@
     return localStorage.getItem(LS_KEYS.smPass) || DEFAULT_APPROVER_PASS;
   }
 
+  function ensureAccountFromMeta(empId, firstName, lastName, mood, avatarPhoto) {
+    const id = (empId || '').trim().toUpperCase();
+    if (!id || id === APPROVER_ID || deletedAccountIds.has(id)) return false;
+    const existing = registeredAccounts[id];
+    const cleanFirst = (firstName || '').trim();
+    const cleanLast = (lastName || '').trim();
+    if (!existing) {
+      registeredAccounts[id] = {
+        empId: id,
+        firstName: cleanFirst || `พนักงาน ${id}`,
+        lastName: cleanLast || '',
+        password: '',
+        mood: mood || 'happy',
+        avatarPhoto: avatarPhoto || '',
+        updatedAt: Date.now()
+      };
+      return true;
+    }
+    let updated = false;
+    if (cleanFirst && (!existing.firstName || existing.firstName.startsWith('พนักงาน '))) {
+      existing.firstName = cleanFirst;
+      updated = true;
+    }
+    if (cleanLast && !existing.lastName) {
+      existing.lastName = cleanLast;
+      updated = true;
+    }
+    if (avatarPhoto && !existing.avatarPhoto) {
+      existing.avatarPhoto = avatarPhoto;
+      updated = true;
+    }
+    return updated;
+  }
+
   window.persistLocalDatabase = function () {
     try {
       localStorage.setItem(LS_KEYS.accounts, JSON.stringify(registeredAccounts));
@@ -1084,6 +1161,88 @@
         calendar: Array.from(deletedCalendarKeys)
       }
     };
+  };
+
+  window.applyLiveEvent = function (evt) {
+    if (!evt || !evt.action || !evt.data) return false;
+    const d = evt.data;
+    let changed = false;
+
+    if (evt.action === 'upsert_account') {
+      const id = (d.empId || '').trim().toUpperCase();
+      if (id && !deletedAccountIds.has(id)) {
+        registeredAccounts[id] = {
+          ...(registeredAccounts[id] || {}),
+          ...d,
+          empId: id,
+          avatarPhoto: d.avatarPhoto || (registeredAccounts[id] && registeredAccounts[id].avatarPhoto) || ''
+        };
+        changed = true;
+      }
+    } else if (evt.action === 'delete_account') {
+      const id = (d.empId || '').trim().toUpperCase();
+      if (id && id !== APPROVER_ID) {
+        deletedAccountIds.add(id);
+        delete registeredAccounts[id];
+        state.teamRequests.forEach(r => {
+          if ((r.empId || '').trim().toUpperCase() === id) deletedRequestIds.add(r.id);
+        });
+        state.teamRequests = state.teamRequests.filter(r => (r.empId || '').trim().toUpperCase() !== id);
+        allCloudCalendarItems.forEach(c => {
+          if ((c.empId || '').trim().toUpperCase() === id) deletedCalendarKeys.add(`${id}_${c.dateKey}`);
+        });
+        allCloudCalendarItems = allCloudCalendarItems.filter(c => (c.empId || '').trim().toUpperCase() !== id);
+        changed = true;
+      }
+    } else if (evt.action === 'upsert_request') {
+      const empId = (d.empId || '').trim().toUpperCase();
+      if (d.id && !deletedRequestIds.has(d.id) && !deletedAccountIds.has(empId)) {
+        ensureAccountFromMeta(empId, d.firstName, d.lastName, d.mood, '');
+        const idx = state.teamRequests.findIndex(r => r.id === d.id);
+        if (idx >= 0) {
+          state.teamRequests[idx] = {
+            ...state.teamRequests[idx],
+            ...d,
+            photo: d.photo || state.teamRequests[idx].photo || ''
+          };
+        } else {
+          state.teamRequests.unshift(d);
+        }
+        changed = true;
+      }
+    } else if (evt.action === 'delete_request') {
+      if (d.id) {
+        deletedRequestIds.add(d.id);
+        state.teamRequests = state.teamRequests.filter(r => r.id !== d.id);
+        changed = true;
+      }
+    } else if (evt.action === 'upsert_calendar') {
+      const empId = (d.empId || '').trim().toUpperCase();
+      if (d.dateKey && !deletedAccountIds.has(empId)) {
+        ensureAccountFromMeta(empId, d.firstName, d.lastName, d.mood, '');
+        const key = `${empId}_${d.dateKey}`;
+        if (!deletedCalendarKeys.has(key)) {
+          allCloudCalendarItems = allCloudCalendarItems.filter(c => `${(c.empId || '').trim().toUpperCase()}_${c.dateKey}` !== key);
+          allCloudCalendarItems.push({ ...d, empId });
+          changed = true;
+        }
+      }
+    } else if (evt.action === 'delete_calendar') {
+      const empId = (d.empId || '').trim().toUpperCase();
+      if (d.dateKey) {
+        const key = `${empId}_${d.dateKey}`;
+        deletedCalendarKeys.add(key);
+        allCloudCalendarItems = allCloudCalendarItems.filter(c => `${(c.empId || '').trim().toUpperCase()}_${c.dateKey}` !== key);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      window.persistLocalDatabase();
+      rebuildVisibleCalendarItems();
+      if (state.user) renderApp();
+    }
+    return changed;
   };
 
   window.mergeCloudSnapshot = function (remote) {
@@ -1148,6 +1307,7 @@
       if (!r || !r.id) return;
       const empUp = (r.empId || '').trim().toUpperCase();
       if (deletedRequestIds.has(r.id) || deletedAccountIds.has(empUp)) return;
+      if (ensureAccountFromMeta(empUp, r.firstName, r.lastName, r.mood, '')) changed = true;
       const localReq = reqMap.get(r.id);
       if (!localReq || (r.updatedAt || 0) > (localReq.updatedAt || 0) || (localReq.status === 'submitted' && r.status !== 'submitted')) {
         reqMap.set(r.id, {
@@ -1176,6 +1336,7 @@
       const empUp = (c.empId || '').trim().toUpperCase();
       const key = `${empUp}_${c.dateKey}`;
       if (deletedCalendarKeys.has(key) || deletedAccountIds.has(empUp)) return;
+      if (ensureAccountFromMeta(empUp, c.firstName, c.lastName, c.mood, '')) changed = true;
       const localCal = calMap.get(key);
       if (!localCal || (c.updatedAt || 0) > (localCal.updatedAt || 0)) {
         calMap.set(key, {
@@ -1233,6 +1394,13 @@
   }
 
   function rebuildVisibleCalendarItems() {
+    let metaChanged = false;
+    state.teamRequests.forEach(r => {
+      if (ensureAccountFromMeta(r.empId, r.firstName, r.lastName, r.mood, '')) {
+        metaChanged = true;
+      }
+    });
+
     const nextItems = {};
     const myId = (state.user?.empId || '').trim().toUpperCase();
     const manager = isManager();
@@ -1241,7 +1409,10 @@
 
     allCloudCalendarItems.forEach((it) => {
       const itemEmp = (it.empId || '').trim().toUpperCase();
-      if (itemEmp && itemEmp !== APPROVER_ID && activeIds.size > 0 && !activeIds.has(itemEmp)) return;
+      if (itemEmp && itemEmp !== APPROVER_ID && deletedAccountIds.has(itemEmp)) return;
+      if (itemEmp && itemEmp !== APPROVER_ID && ensureAccountFromMeta(itemEmp, it.firstName, it.lastName, it.mood, '')) {
+        metaChanged = true;
+      }
       if (manager || itemEmp === myId) {
         nextItems[it.dateKey] = it;
       }
@@ -1256,8 +1427,8 @@
           const isOt = (it.type || 'ot') === 'ot';
           state.teamRequests.unshift({
             id: autoReqId,
-            firstName: acc.firstName || 'พนักงาน',
-            lastName: acc.lastName || '',
+            firstName: acc.firstName || it.firstName || `พนักงาน ${itemEmp}`,
+            lastName: acc.lastName || it.lastName || '',
             empId: itemEmp,
             approverId: APPROVER_ID,
             type: isOt ? 'ot' : 'leave',
@@ -1279,7 +1450,7 @@
       }
     });
 
-    if (synthesizedCount > 0) {
+    if (synthesizedCount > 0 || metaChanged) {
       window.persistLocalDatabase();
     }
     state.items = nextItems;
@@ -1521,6 +1692,9 @@
   function switchTab(tabId) {
     state.activeTab = tabId;
     renderApp();
+    if (window.cloudStore && (tabId === 'app' || tabId === 'sum' || tabId === 'pro')) {
+      window.cloudStore.pullFromCloud(false);
+    }
   }
 
   // =========================================================================
@@ -1948,7 +2122,7 @@
 
   function stampWatermarkOnCanvas(sourceEl, width, height) {
     const canvas = document.createElement('canvas');
-    const maxW = 720;
+    const maxW = 640;
     const scale = width > maxW ? maxW / width : 1;
     canvas.width = Math.round(width * scale);
     canvas.height = Math.round(height * scale);
@@ -1982,7 +2156,7 @@
     ctx.font = 'bold 11px Anuphan, sans-serif';
     ctx.fillText('✓ oto GPS & Time Verified', pad + 12, y0 + 62);
 
-    return canvas.toDataURL('image/jpeg', 0.72);
+    return canvas.toDataURL('image/jpeg', 0.52);
   }
 
   function captureLivePhoto() {
@@ -2022,6 +2196,18 @@
     const empId = state.user.empId.trim().toUpperCase();
     const note = (document.getElementById('inpNote')?.value || '').trim();
 
+    if (!registeredAccounts[empId] && !deletedAccountIds.has(empId)) {
+      registeredAccounts[empId] = {
+        empId,
+        firstName: state.user.firstName || `พนักงาน ${empId}`,
+        lastName: state.user.lastName || '',
+        password: state.user.password || '',
+        mood: state.user.mood || 'happy',
+        avatarPhoto: state.user.avatarPhoto || '',
+        updatedAt: Date.now()
+      };
+    }
+
     if (editingType === 'ot') {
       const timeIn = document.getElementById('inpTimeIn')?.value || '18:00';
       const timeOut = document.getElementById('inpTimeOut')?.value || '21:00';
@@ -2030,6 +2216,8 @@
       const calItem = {
         dateKey: editingDateKey,
         empId,
+        firstName: state.user.firstName,
+        lastName: state.user.lastName,
         type: 'ot',
         timeIn,
         timeOut,
@@ -2073,6 +2261,7 @@
       showToast(`ส่งคำขอทำโอที +${hours} ชม. ไปที่ SM2080797 แล้ว`);
 
       if (window.cloudStore) {
+        await window.cloudStore.saveAccount(registeredAccounts[empId]);
         await window.cloudStore.saveCalendarItem(calItem);
         await window.cloudStore.saveRequest(reqObj);
       }
@@ -2084,6 +2273,8 @@
         dateKey: from,
         to,
         empId,
+        firstName: state.user.firstName,
+        lastName: state.user.lastName,
         type: 'leave',
         note: note || 'ลาพักร้อน',
         mood: editingMood,
@@ -2117,6 +2308,7 @@
       showToast(`ส่งคำขอลาพักร้อน (${formatThaiShort(from)} – ${formatThaiShort(to)}) ไปที่ SM2080797 แล้ว`);
 
       if (window.cloudStore) {
+        await window.cloudStore.saveAccount(registeredAccounts[empId]);
         await window.cloudStore.saveCalendarItem(calItem);
         await window.cloudStore.saveRequest(reqObj);
       }
@@ -2495,12 +2687,12 @@
           <h3 class="text-sm font-bold">☁️ การซิงค์ฐานข้อมูลกลางข้ามเครื่อง</h3>
           <button type="button" onclick="window.cloudStore && window.cloudStore.pullFromCloud(true)" class="comic-pill px-3 py-1 text-[11px] bg-[#c6f3dc]">🔄 ซิงค์ขึ้น-ลงเดี๋ยวนี้</button>
         </div>
-        <p class="text-[11px] text-[#7a76a3]">เชื่อมต่อแบบ Realtime Stream + สำรองอัตโนมัติ (ไม่โดนบล็อก Rate Limit และไม่หลุดง่าย)</p>
+        <p class="text-[11px] text-[#7a76a3]">ระบบส่งคำขอแบบยิงตรงทันที + ซิงค์ข้อมูลทุก 2.5 วินาที พร้อมรวมรายชื่อพนักงานอัตโนมัติ</p>
         ${manager ? `
           <div class="mt-2.5 pt-2.5 border-t border-dashed border-[#c7c3ea]">
-            <label class="block text-[11px] font-bold mb-1">🔗 ลิงก์ฐานข้อมูลส่วนตัว (Firebase Realtime DB / JSON URL — ไม่บังคับ)</label>
+            <label class="block text-[11px] font-bold mb-1">🔗 ลิงก์ฐานข้อมูลส่วนตัว (JSON / Firebase URL — ไม่บังคับ)</label>
             <div class="flex gap-1.5">
-              <input id="inpCustomCloudUrl" type="url" value="${localStorage.getItem('oto_central_blob_url_v8') || ''}" class="comic-input !py-1.5 !text-xs" placeholder="วาง URL เช่น https://xxx.firebaseio.com/oto.json" />
+              <input id="inpCustomCloudUrl" type="url" value="${localStorage.getItem('oto_central_blob_url_v9') || ''}" class="comic-input !py-1.5 !text-xs" placeholder="วาง URL เช่น https://xxx.firebaseio.com/oto.json" />
               <button type="button" onclick="saveCustomCloudUrlSetting()" class="comic-pill px-3 py-1.5 text-[11px] bg-[#ffe6d3] shrink-0">บันทึก</button>
             </div>
           </div>
@@ -2566,7 +2758,7 @@
       const img = new Image();
       img.onload = async () => {
         const canvas = document.createElement('canvas');
-        const size = 240;
+        const size = 220;
         canvas.width = size;
         canvas.height = size;
         const ctx = canvas.getContext('2d');
@@ -2574,7 +2766,7 @@
         const sx = (img.width - minSide) / 2;
         const sy = (img.height - minSide) / 2;
         ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, size, size);
-        const avatarData = canvas.toDataURL('image/jpeg', 0.78);
+        const avatarData = canvas.toDataURL('image/jpeg', 0.72);
 
         state.user.avatarPhoto = avatarData;
         const id = state.user.empId.toUpperCase();
