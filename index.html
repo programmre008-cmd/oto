@@ -12,6 +12,7 @@
   <link id="appleTouchIconLink" rel="apple-touch-icon" />
   <title>oto — ปฏิทินโอที & ลาพักร้อน</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600;700&family=Fredoka:wght@600;700&family=Kanit:wght@500;600;700&display=swap" rel="stylesheet">
@@ -346,31 +347,6 @@
       display: none;
     }
 
-    .swipe-card-wrap {
-      position: relative;
-      overflow: hidden;
-      border-radius: 26px;
-    }
-    .swipe-bg {
-      position: absolute;
-      inset: 0;
-      border-radius: 26px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 22px;
-      font-family: 'Kanit', sans-serif;
-      font-weight: 700;
-      font-size: 14px;
-      border: 2.5px solid var(--ink);
-    }
-    .swipe-card-front {
-      position: relative;
-      z-index: 2;
-      transition: transform 0.2s ease;
-      touch-action: pan-y;
-    }
-
     .toast-pill {
       position: absolute;
       bottom: 92px;
@@ -460,12 +436,12 @@
       </div>
 
       <p id="authHelperNote" class="text-[11px] text-[#c7c3ea] leading-relaxed">
-        * ระบบจำรหัสพนักงานที่สร้างไว้ถาวร กรอก <b>รหัสพนักงาน</b> และ <b>รหัสผ่าน</b> เพื่อเข้าใช้งานได้ทันที
+        * ระบบจำรหัสพนักงานและซิงค์ข้อมูลข้ามเครื่อง (คอมฯ ↔ มือถือ) อัตโนมัติ
       </p>
 
       <div class="flex items-center justify-between text-[11px] bg-[#262259] border border-[#4c4694] rounded-2xl px-3 py-1.5">
-        <span class="text-[#c7c3ea]">☁️ สถานะฐานข้อมูล:</span>
-        <span id="cloudSyncStatusText" class="text-[#36c78c] font-bold">จำรหัสและข้อมูลลงฐานข้อมูลพร้อมใช้ ✓</span>
+        <span class="text-[#c7c3ea]">☁️ ซิงค์ข้อมูลออนไลน์:</span>
+        <span id="cloudSyncStatusText" class="text-[#36c78c] font-bold">เชื่อมต่อซิงค์ข้ามเครื่องพร้อมใช้ ✓</span>
       </div>
 
       <button type="button" id="btnAuthSubmit" onclick="handleLogin()" class="comic-btn w-full py-3.5 bg-[#ffb98a] text-[#1e1b4b] text-base mt-1">
@@ -510,39 +486,31 @@
   <div class="toast-pill" id="toastPill"></div>
 </div>
 
-<!-- Cloud Database & Cross-Device Sync (Firebase Firestore + Local Storage Backup) -->
+<!-- Cross-Device Real-Time Cloud Sync (Gun.js P2P Relay + Firebase Firestore + LocalStorage) -->
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
   import { getAuth, signInAnonymously, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
   import { getFirestore, doc, setDoc, deleteDoc, collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
   const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-  const appId = typeof __app_id !== 'undefined' ? __app_id : 'oto-ot-leave-app';
+  const appId = typeof __app_id !== 'undefined' ? __app_id : 'oto-ot-leave-shared-v3';
+  const GUN_NAMESPACE = 'oto-team-shared-db-v3-2026';
 
-  window.cloudStore = {
-    ready: false,
-    db: null,
-    auth: null,
-    user: null,
-    saveAccount: async (acc) => {
-      if (typeof window.persistLocalDatabase === 'function') window.persistLocalDatabase();
-    },
-    deleteAccount: async (empId) => {
-      if (typeof window.persistLocalDatabase === 'function') window.persistLocalDatabase();
-    },
-    saveRequest: async (req) => {
-      if (typeof window.persistLocalDatabase === 'function') window.persistLocalDatabase();
-    },
-    deleteRequest: async (reqId) => {
-      if (typeof window.persistLocalDatabase === 'function') window.persistLocalDatabase();
-    },
-    saveCalendarItem: async (dateKey, item) => {
-      if (typeof window.persistLocalDatabase === 'function') window.persistLocalDatabase();
-    },
-    deleteCalendarItem: async (empId, dateKey) => {
-      if (typeof window.persistLocalDatabase === 'function') window.persistLocalDatabase();
+  let gunRoot = null;
+  try {
+    if (typeof window.Gun === 'function') {
+      const gun = window.Gun({
+        peers: [
+          'https://gun-manhattan.herokuapp.com/gun',
+          'https://relay.peer.ooo/gun',
+          'https://peer.wallie.io/gun'
+        ]
+      });
+      gunRoot = gun.get(GUN_NAMESPACE);
     }
-  };
+  } catch (e) {
+    console.warn('Gun relay init warning:', e);
+  }
 
   function updateCloudStatusBadge(text, ok = true) {
     const el = document.getElementById('cloudSyncStatusText');
@@ -552,11 +520,169 @@
     }
   }
 
-  async function initCloudDatabase() {
-    if (!firebaseConfig) {
-      updateCloudStatusBadge('จำรหัสและข้อมูลลงฐานข้อมูลพร้อมใช้ ✓', true);
-      return;
+  window.cloudStore = {
+    ready: false,
+    db: null,
+    auth: null,
+    user: null,
+    saveAccount: async (acc) => {
+      if (typeof window.persistLocalDatabase === 'function') window.persistLocalDatabase();
+      if (!acc?.empId) return;
+      const cleanId = acc.empId.trim().toUpperCase();
+      const payload = {
+        empId: cleanId,
+        firstName: acc.firstName || '',
+        lastName: acc.lastName || '',
+        password: acc.password || '',
+        avatar: acc.avatar && acc.avatar.length > 180000 ? '' : (acc.avatar || '')
+      };
+      if (gunRoot) {
+        gunRoot.get('accounts').get(cleanId).put(JSON.stringify(payload));
+      }
+      if (window.cloudStore.user && window.cloudStore.db) {
+        await setDoc(doc(window.cloudStore.db, 'artifacts', appId, 'public', 'data', 'oto_accounts', cleanId), payload);
+      }
+    },
+    deleteAccount: async (empId) => {
+      if (typeof window.persistLocalDatabase === 'function') window.persistLocalDatabase();
+      if (!empId) return;
+      const cleanId = empId.trim().toUpperCase();
+      if (gunRoot) {
+        gunRoot.get('accounts').get(cleanId).put(null);
+      }
+      if (window.cloudStore.user && window.cloudStore.db) {
+        await deleteDoc(doc(window.cloudStore.db, 'artifacts', appId, 'public', 'data', 'oto_accounts', cleanId));
+      }
+    },
+    saveRequest: async (req) => {
+      if (typeof window.persistLocalDatabase === 'function') window.persistLocalDatabase();
+      if (!req?.id) return;
+      const safePhoto = req.photo && req.photo.length > 260000 ? '' : (req.photo || '');
+      const payload = {
+        ...req,
+        photo: safePhoto,
+        approverId: 'SM2080797',
+        updatedAt: req.updatedAt || Date.now()
+      };
+      if (gunRoot) {
+        gunRoot.get('requests').get(req.id).put(JSON.stringify(payload));
+      }
+      if (window.cloudStore.user && window.cloudStore.db) {
+        await setDoc(doc(window.cloudStore.db, 'artifacts', appId, 'public', 'data', 'oto_requests', req.id), payload);
+      }
+    },
+    deleteRequest: async (reqId) => {
+      if (typeof window.persistLocalDatabase === 'function') window.persistLocalDatabase();
+      if (!reqId) return;
+      if (gunRoot) {
+        gunRoot.get('requests').get(reqId).put(null);
+      }
+      if (window.cloudStore.user && window.cloudStore.db) {
+        await deleteDoc(doc(window.cloudStore.db, 'artifacts', appId, 'public', 'data', 'oto_requests', reqId));
+      }
+    },
+    saveCalendarItem: async (dateKey, item) => {
+      if (typeof window.persistLocalDatabase === 'function') window.persistLocalDatabase();
+      if (!dateKey || !item) return;
+      const empKey = (item.empId || 'EMP').trim().toUpperCase();
+      const docId = `${empKey}_${dateKey}`;
+      const safePhoto = item.photo && item.photo.length > 260000 ? '' : (item.photo || '');
+      const payload = {
+        ...item,
+        photo: safePhoto,
+        dateKey,
+        empId: empKey
+      };
+      if (gunRoot) {
+        gunRoot.get('calendar').get(docId).put(JSON.stringify(payload));
+      }
+      if (window.cloudStore.user && window.cloudStore.db) {
+        await setDoc(doc(window.cloudStore.db, 'artifacts', appId, 'public', 'data', 'oto_calendar_items', docId), payload);
+      }
+    },
+    deleteCalendarItem: async (empId, dateKey) => {
+      if (typeof window.persistLocalDatabase === 'function') window.persistLocalDatabase();
+      if (!dateKey) return;
+      const empKey = (empId || 'EMP').trim().toUpperCase();
+      const docId = `${empKey}_${dateKey}`;
+      if (gunRoot) {
+        gunRoot.get('calendar').get(docId).put(null);
+      }
+      if (window.cloudStore.user && window.cloudStore.db) {
+        await deleteDoc(doc(window.cloudStore.db, 'artifacts', appId, 'public', 'data', 'oto_calendar_items', docId));
+      }
+    },
+    pushAllLocalToCloud: () => {
+      if (typeof window.getAllLocalSyncSnapshot !== 'function') return;
+      const snap = window.getAllLocalSyncSnapshot();
+      Object.values(snap.accounts || {}).forEach(acc => window.cloudStore.saveAccount(acc));
+      (snap.requests || []).forEach(req => window.cloudStore.saveRequest(req));
+      (snap.calendar || []).forEach(it => window.cloudStore.saveCalendarItem(it.dateKey, it));
     }
+  };
+
+  function setupGunListeners() {
+    if (!gunRoot) return;
+    updateCloudStatusBadge('ออนไลน์ · ซิงค์คอมฯ ↔ มือถือเรียลไทม์ ✓', true);
+
+    gunRoot.get('accounts').map().on((raw, key) => {
+      if (!key || key === '_') return;
+      const cleanId = key.trim().toUpperCase();
+      if (raw === null) {
+        if (typeof window.removeDeletedAccountFromSync === 'function') {
+          window.removeDeletedAccountFromSync(cleanId);
+        }
+        return;
+      }
+      try {
+        const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (data && data.empId && typeof window.syncAccountsFromCloud === 'function') {
+          window.syncAccountsFromCloud({ [cleanId]: data });
+        }
+      } catch (e) {}
+    });
+
+    gunRoot.get('requests').map().on((raw, key) => {
+      if (!key || key === '_') return;
+      if (raw === null) {
+        if (typeof window.removeDeletedRequestFromSync === 'function') {
+          window.removeDeletedRequestFromSync(key);
+        }
+        return;
+      }
+      try {
+        const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (data && data.id && typeof window.syncRequestsFromCloud === 'function') {
+          window.syncRequestsFromCloud([data]);
+        }
+      } catch (e) {}
+    });
+
+    gunRoot.get('calendar').map().on((raw, key) => {
+      if (!key || key === '_') return;
+      if (raw === null) {
+        if (typeof window.removeDeletedCalendarFromSync === 'function') {
+          window.removeDeletedCalendarFromSync(key);
+        }
+        return;
+      }
+      try {
+        const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (data && data.dateKey && typeof window.syncCalendarFromCloud === 'function') {
+          window.syncCalendarFromCloud([data]);
+        }
+      } catch (e) {}
+    });
+
+    setTimeout(() => {
+      window.cloudStore.pushAllLocalToCloud();
+    }, 1200);
+  }
+
+  async function initCloudDatabase() {
+    setupGunListeners();
+    if (!firebaseConfig) return;
+
     try {
       const fbApp = initializeApp(firebaseConfig);
       const auth = getAuth(fbApp);
@@ -580,66 +706,6 @@
       const accountsCol = collection(db, 'artifacts', appId, 'public', 'data', 'oto_accounts');
       const requestsCol = collection(db, 'artifacts', appId, 'public', 'data', 'oto_requests');
       const calItemsCol = collection(db, 'artifacts', appId, 'public', 'data', 'oto_calendar_items');
-
-      window.cloudStore.saveAccount = async (acc) => {
-        if (typeof window.persistLocalDatabase === 'function') window.persistLocalDatabase();
-        if (!window.cloudStore.user || !acc?.empId) return;
-        const cleanId = acc.empId.trim().toUpperCase();
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'oto_accounts', cleanId), {
-          empId: cleanId,
-          firstName: acc.firstName || '',
-          lastName: acc.lastName || '',
-          password: acc.password || '',
-          avatar: acc.avatar && acc.avatar.length > 250000 ? '' : (acc.avatar || '')
-        });
-      };
-
-      window.cloudStore.deleteAccount = async (empId) => {
-        if (typeof window.persistLocalDatabase === 'function') window.persistLocalDatabase();
-        if (!window.cloudStore.user || !empId) return;
-        const cleanId = empId.trim().toUpperCase();
-        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'oto_accounts', cleanId));
-      };
-
-      window.cloudStore.saveRequest = async (req) => {
-        if (typeof window.persistLocalDatabase === 'function') window.persistLocalDatabase();
-        if (!window.cloudStore.user || !req?.id) return;
-        const safePhoto = req.photo && req.photo.length > 450000 ? '' : (req.photo || '');
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'oto_requests', req.id), {
-          ...req,
-          photo: safePhoto,
-          approverId: 'SM2080797',
-          updatedAt: req.updatedAt || Date.now()
-        });
-      };
-
-      window.cloudStore.deleteRequest = async (reqId) => {
-        if (typeof window.persistLocalDatabase === 'function') window.persistLocalDatabase();
-        if (!window.cloudStore.user || !reqId) return;
-        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'oto_requests', reqId));
-      };
-
-      window.cloudStore.saveCalendarItem = async (dateKey, item) => {
-        if (typeof window.persistLocalDatabase === 'function') window.persistLocalDatabase();
-        if (!window.cloudStore.user || !dateKey || !item) return;
-        const empKey = (item.empId || 'EMP').trim().toUpperCase();
-        const docId = `${empKey}_${dateKey}`;
-        const safePhoto = item.photo && item.photo.length > 450000 ? '' : (item.photo || '');
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'oto_calendar_items', docId), {
-          ...item,
-          photo: safePhoto,
-          dateKey,
-          empId: empKey
-        });
-      };
-
-      window.cloudStore.deleteCalendarItem = async (empId, dateKey) => {
-        if (typeof window.persistLocalDatabase === 'function') window.persistLocalDatabase();
-        if (!window.cloudStore.user || !dateKey) return;
-        const empKey = (empId || 'EMP').trim().toUpperCase();
-        const docId = `${empKey}_${dateKey}`;
-        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'oto_calendar_items', docId));
-      };
 
       onSnapshot(accountsCol, (snap) => {
         const latest = {};
@@ -678,7 +744,6 @@
       }, (err) => console.warn('Calendar sync warning:', err));
     } catch (e) {
       console.warn('Cloud init fallback:', e);
-      updateCloudStatusBadge('จำรหัสและข้อมูลลงฐานข้อมูลพร้อมใช้ ✓', true);
     }
   }
 
@@ -819,7 +884,7 @@
   }
 
   // =========================================================================
-  // ฐานข้อมูลจำรหัสและรายการถาวร (LocalStorage + ซิงค์ข้ามแท็บ + Cloud Sync)
+  // ฐานข้อมูลจำรหัสและรายการถาวร (LocalStorage + ซิงค์คอมฯ ↔ มือถือเรียลไทม์)
   // =========================================================================
   const LOCAL_DB_KEYS = {
     accounts: 'oto_db_accounts_v2',
@@ -829,7 +894,18 @@
   };
 
   const registeredAccounts = {};
+  const deletedAccountIds = new Set();
+  const deletedRequestIds = new Set();
+  const deletedCalendarDocIds = new Set();
   let allCloudCalendarItems = [];
+
+  window.getAllLocalSyncSnapshot = function() {
+    return {
+      accounts: { ...registeredAccounts },
+      requests: [...state.teamRequests],
+      calendar: [...allCloudCalendarItems]
+    };
+  };
 
   function loadLocalDatabase() {
     try {
@@ -869,11 +945,11 @@
       try {
         const compactReqs = state.teamRequests.map(r => ({
           ...r,
-          photo: r.photo && r.photo.length > 160000 ? '' : r.photo
+          photo: r.photo && r.photo.length > 140000 ? '' : r.photo
         }));
         const compactCal = allCloudCalendarItems.map(it => ({
           ...it,
-          photo: it.photo && it.photo.length > 160000 ? '' : it.photo
+          photo: it.photo && it.photo.length > 140000 ? '' : it.photo
         }));
         localStorage.setItem(LOCAL_DB_KEYS.accounts, JSON.stringify(registeredAccounts));
         localStorage.setItem(LOCAL_DB_KEYS.requests, JSON.stringify(compactReqs));
@@ -910,8 +986,46 @@
     renderApp();
   });
 
+  window.removeDeletedAccountFromSync = function(cleanId) {
+    if (!cleanId) return;
+    deletedAccountIds.add(cleanId);
+    delete registeredAccounts[cleanId];
+    state.teamRequests = state.teamRequests.filter(r => (r.empId || '').trim().toUpperCase() !== cleanId);
+    allCloudCalendarItems = allCloudCalendarItems.filter(it => (it.empId || '').trim().toUpperCase() !== cleanId);
+    window.persistLocalDatabase();
+    rebuildVisibleCalendarItems();
+    if (!document.getElementById('loginScreen').classList.contains('hidden')) return;
+    renderApp();
+  };
+
+  window.removeDeletedRequestFromSync = function(reqId) {
+    if (!reqId) return;
+    deletedRequestIds.add(reqId);
+    state.teamRequests = state.teamRequests.filter(r => r.id !== reqId);
+    window.persistLocalDatabase();
+    if (!document.getElementById('loginScreen').classList.contains('hidden')) return;
+    renderApp();
+  };
+
+  window.removeDeletedCalendarFromSync = function(docId) {
+    if (!docId) return;
+    deletedCalendarDocIds.add(docId);
+    allCloudCalendarItems = allCloudCalendarItems.filter(
+      it => `${(it.empId || 'EMP').toUpperCase()}_${it.dateKey}` !== docId
+    );
+    window.persistLocalDatabase();
+    rebuildVisibleCalendarItems();
+    if (!document.getElementById('loginScreen').classList.contains('hidden')) return;
+    renderApp();
+  };
+
   window.syncAccountsFromCloud = function(latestMap) {
-    Object.assign(registeredAccounts, latestMap);
+    Object.entries(latestMap || {}).forEach(([k, v]) => {
+      const cleanId = k.trim().toUpperCase();
+      if (!deletedAccountIds.has(cleanId) && v && v.empId) {
+        registeredAccounts[cleanId] = v;
+      }
+    });
     window.persistLocalDatabase();
     if (state.user && state.user.empId && !isManager()) {
       const me = registeredAccounts[state.user.empId.trim().toUpperCase()];
@@ -929,8 +1043,17 @@
   window.syncRequestsFromCloud = function(latestList) {
     if (Array.isArray(latestList)) {
       const mergedMap = new Map();
-      state.teamRequests.forEach(r => { if (r?.id) mergedMap.set(r.id, r); });
-      latestList.forEach(r => { if (r?.id) mergedMap.set(r.id, r); });
+      state.teamRequests.forEach(r => {
+        if (r?.id && !deletedRequestIds.has(r.id)) mergedMap.set(r.id, r);
+      });
+      latestList.forEach(r => {
+        if (r?.id && !deletedRequestIds.has(r.id)) {
+          const prev = mergedMap.get(r.id);
+          if (!prev || (r.updatedAt || 0) >= (prev.updatedAt || 0)) {
+            mergedMap.set(r.id, r);
+          }
+        }
+      });
       state.teamRequests = Array.from(mergedMap.values()).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
       window.persistLocalDatabase();
     }
@@ -942,10 +1065,16 @@
     if (Array.isArray(allItems)) {
       const mergedCal = new Map();
       allCloudCalendarItems.forEach(it => {
-        if (it?.dateKey) mergedCal.set(`${(it.empId || 'EMP').toUpperCase()}_${it.dateKey}`, it);
+        if (it?.dateKey) {
+          const docId = `${(it.empId || 'EMP').toUpperCase()}_${it.dateKey}`;
+          if (!deletedCalendarDocIds.has(docId)) mergedCal.set(docId, it);
+        }
       });
       allItems.forEach(it => {
-        if (it?.dateKey) mergedCal.set(`${(it.empId || 'EMP').toUpperCase()}_${it.dateKey}`, it);
+        if (it?.dateKey) {
+          const docId = `${(it.empId || 'EMP').toUpperCase()}_${it.dateKey}`;
+          if (!deletedCalendarDocIds.has(docId)) mergedCal.set(docId, it);
+        }
       });
       allCloudCalendarItems = Array.from(mergedCal.values());
       window.persistLocalDatabase();
@@ -971,7 +1100,7 @@
     state.items = nextItems;
   }
 
-  let authMode = 'login'; // 'login' | 'register'
+  let authMode = 'login';
 
   const state = {
     user: { firstName: '', lastName: '', empId: '', avatar: '' },
@@ -1010,12 +1139,6 @@
   function parseDate(key) {
     const [y, m, d] = key.split('-').map(Number);
     return new Date(Date.UTC(y, m - 1, d));
-  }
-
-  function addDays(key, delta) {
-    const dt = parseDate(key);
-    dt.setUTCDate(dt.getUTCDate() + delta);
-    return `${dt.getUTCFullYear()}-${pad2(dt.getUTCMonth() + 1)}-${pad2(dt.getUTCDate())}`;
   }
 
   function formatThaiShort(key) {
@@ -1080,14 +1203,14 @@
       btnSubmit.textContent = 'เข้าใช้งานระบบ';
       btnSubmit.className = 'comic-btn w-full py-3.5 bg-[#ffb98a] text-[#1e1b4b] text-base mt-1';
       lblPass.textContent = 'รหัสผ่าน (Password)';
-      helper.innerHTML = '* ระบบจำรหัสพนักงานที่สร้างไว้ถาวร กรอก <b>รหัสพนักงาน</b> และ <b>รหัสผ่าน</b> เพื่อเข้าใช้งานได้ทันที';
+      helper.innerHTML = '* ระบบจำรหัสพนักงานและซิงค์ข้อมูลข้ามเครื่อง (คอมฯ ↔ มือถือ) อัตโนมัติ';
     } else {
       btnLogin.className = 'comic-pill py-2 text-xs font-bold bg-[#2c2866] text-white border-[#7a76a3]';
       btnReg.className = 'comic-pill py-2 text-xs font-bold bg-[#c6f3dc] text-[#1e1b4b] border-white';
       btnSubmit.textContent = '✨ สร้างรหัสและเข้าใช้งาน';
       btnSubmit.className = 'comic-btn w-full py-3.5 bg-[#c6f3dc] text-[#1e1b4b] text-base mt-1';
       lblPass.textContent = 'ตั้งรหัสผ่านใหม่ (Password)';
-      helper.innerHTML = '* กรอก <b>รหัสพนักงาน</b> <b>ชื่อ</b> <b>นามสกุล</b> และ <b>ตั้ง Password</b> (ระบบจะจำรหัสนี้ไว้ใช้ครั้งต่อไป)';
+      helper.innerHTML = '* กรอก <b>รหัสพนักงาน</b> <b>ชื่อ</b> <b>นามสกุล</b> และ <b>ตั้ง Password</b> (ซิงค์เข้าได้ทั้งคอมฯ และมือถือ)';
     }
     onAuthEmpIdChange();
   }
@@ -1172,6 +1295,7 @@
         showToast(`รหัส ${empId} มีในระบบแล้ว กรุณากดเข้าสู่ระบบ`);
         return;
       }
+      deletedAccountIds.delete(empId);
       registeredAccounts[empId] = { firstName, lastName, empId, password };
       window.persistLocalDatabase();
       saveLastAuthHint(empId, password);
@@ -1180,7 +1304,7 @@
       rebuildVisibleCalendarItems();
       state.activeTab = 'cal';
       document.getElementById('loginScreen').classList.add('hidden');
-      showToast(`สร้างรหัส ${empId} (${firstName} ${lastName}) และบันทึกถาวรแล้ว ✓`);
+      showToast(`สร้างรหัส ${empId} (${firstName} ${lastName}) และซิงค์ออนไลน์แล้ว ✓`);
       renderApp();
       return;
     }
@@ -1201,6 +1325,7 @@
         showToast('ไม่พบรหัสนี้ในฐานข้อมูล กรุณากด "✨ สร้างรหัสพนักงาน" เพื่อลงทะเบียน');
         return;
       }
+      deletedAccountIds.delete(empId);
       registeredAccounts[empId] = { firstName, lastName, empId, password };
       window.persistLocalDatabase();
       saveLastAuthHint(empId, password);
@@ -1483,7 +1608,7 @@
   }
 
   // =========================================================================
-  // Day Entry Bottom Sheet (OT & Leave Form with GPS + Camera Stamp)
+  // Day Entry Bottom Sheet (OT & Leave Form with GPS + Front/Rear Camera)
   // =========================================================================
   let currentDateKey = TODAY;
   let currentTabType = 'ot';
@@ -1493,6 +1618,7 @@
   let currentPhotoLocation = '';
   let lastGpsCoords = null;
   let cameraMediaStream = null;
+  let cameraFacingMode = 'environment'; // 'environment' (กล้องหลัง) | 'user' (กล้องหน้า)
   const MAX_CONSECUTIVE_LEAVE_DAYS = 5;
 
   function detectCheckoutLocation(silent = false) {
@@ -1720,14 +1846,22 @@
       showToast(`สิทธิ์ผู้อนุมัติ ${APPROVER_ID} ไม่สามารถบันทึกหรือแก้ไขเวลาของใครได้`);
       return;
     }
+    stopLiveCamera();
     currentDateKey = dateKey;
     const existing = state.items[dateKey];
     const bkkNow = getBangkokNowParts();
+
+    // รีเซ็ตรูปเช็คเอาท์ทุกครั้งเมื่อเปิดวันใหม่ที่ยังไม่มีรูปบันทึกไว้ (ป้องกันรูปวันเก่าติดมา)
+    currentPhoto = '';
     currentTabType = existing ? existing.type : 'ot';
     currentMood = existing ? existing.mood : 'happy';
-    currentPhoto = existing && existing.photo ? existing.photo : '';
-    currentPhotoTime = existing && existing.checkoutTime ? existing.checkoutTime.replace(' น.', '') : bkkNow.timeString.slice(0, 5);
-    currentPhotoLocation = existing && existing.checkoutLocation ? existing.checkoutLocation : '';
+    currentPhoto = (existing && existing.dateKey === dateKey && existing.photo) ? existing.photo : '';
+    currentPhotoTime = (existing && existing.dateKey === dateKey && existing.checkoutTime)
+      ? existing.checkoutTime.replace(' น.', '')
+      : bkkNow.timeString.slice(0, 5);
+    currentPhotoLocation = (existing && existing.dateKey === dateKey && existing.checkoutLocation)
+      ? existing.checkoutLocation
+      : '';
     lastGpsCoords = null;
 
     if (!currentPhotoLocation) {
@@ -1775,7 +1909,7 @@
 
         <div class="comic-card p-3.5">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-bold">รูปหลักฐานเช็คเอาท์ * (ถ่ายสดพร้อมเวลาและสถานที่ GPS)</span>
+            <span class="text-xs font-bold">รูปหลักฐานเช็คเอาท์ * (กล้องหน้า/หลัง + เวลาและ GPS)</span>
           </div>
 
           <div class="grid grid-cols-2 gap-2 mb-2.5">
@@ -1793,18 +1927,30 @@
           </div>
 
           <div class="grid grid-cols-2 gap-2">
-            <button type="button" onclick="openCameraCapture()" class="comic-pill py-2.5 px-2 text-xs bg-[#ffb98a] flex items-center justify-center gap-1 font-bold">
-              <span>📸</span><span>ถ่ายด้วยกล้อง</span>
+            <button type="button" onclick="openCameraCapture('environment')" class="comic-pill py-2.5 px-2 text-xs bg-[#ffb98a] flex items-center justify-center gap-1 font-bold">
+              <span>📷</span><span>กล้องหลัง</span>
             </button>
-            <label class="comic-pill py-2.5 px-2 text-xs bg-[#e5e2ff] flex items-center justify-center gap-1 cursor-pointer text-center font-bold">
-              <span>🖼️</span><span>เลือกรูปในเครื่อง</span>
+            <button type="button" onclick="openCameraCapture('user')" class="comic-pill py-2.5 px-2 text-xs bg-[#ffd6e0] flex items-center justify-center gap-1 font-bold">
+              <span>🤳</span><span>กล้องหน้า</span>
+            </button>
+          </div>
+          <div class="mt-2">
+            <label class="comic-pill w-full py-2 px-2 text-xs bg-[#e5e2ff] flex items-center justify-center gap-1 cursor-pointer text-center font-bold">
+              <span>🖼️</span><span>เลือกรูปจากอัลบั้มในเครื่อง</span>
               <input type="file" id="inpPhotoFile" accept="image/*" class="hidden" />
             </label>
           </div>
-          <input type="file" id="inpCameraFile" accept="image/*" capture="environment" class="hidden" />
+          <input type="file" id="inpCameraFileRear" accept="image/*" capture="environment" class="hidden" />
+          <input type="file" id="inpCameraFileFront" accept="image/*" capture="user" class="hidden" />
 
           <div id="liveCameraBox" class="hidden mt-2.5 rounded-2xl overflow-hidden border-2 border-[#1e1b4b] bg-[#1e1b4b] p-2">
-            <video id="liveCameraVideo" autoplay playsinline class="w-full h-48 object-cover rounded-xl bg-black"></video>
+            <div class="flex items-center justify-between text-white text-[11px] font-bold px-1 pb-1.5">
+              <span id="cameraFacingLabel">📷 โหมด: กล้องหลัง</span>
+              <button type="button" onclick="toggleCameraFacing()" class="px-2.5 py-0.5 rounded-full bg-[#e5e2ff] text-[#1e1b4b] border border-white text-[11px] font-bold">
+                🔄 สลับกล้องหน้า / หลัง
+              </button>
+            </div>
+            <video id="liveCameraVideo" autoplay playsinline class="w-full h-52 object-cover rounded-xl bg-black"></video>
             <div class="grid grid-cols-2 gap-2 mt-2">
               <button type="button" onclick="snapFromLiveCamera()" class="comic-btn py-2 bg-[#c6f3dc] text-[#1e1b4b] text-xs">📸 กดถ่ายรูป</button>
               <button type="button" onclick="stopLiveCamera()" class="comic-btn py-2 bg-white text-[#1e1b4b] text-xs">ยกเลิกกล้อง</button>
@@ -1866,7 +2012,8 @@
 
     updateCheckoutPhotoPreview();
     document.getElementById('inpPhotoFile').addEventListener('change', handlePhotoUpload);
-    document.getElementById('inpCameraFile').addEventListener('change', handlePhotoUpload);
+    document.getElementById('inpCameraFileRear').addEventListener('change', handlePhotoUpload);
+    document.getElementById('inpCameraFileFront').addEventListener('change', handlePhotoUpload);
     document.getElementById('daySheet').classList.add('open');
     validateForm();
   }
@@ -1880,7 +2027,8 @@
     if (box) box.classList.add('hidden');
   }
 
-  async function openCameraCapture() {
+  async function openCameraCapture(preferredFacing = 'environment') {
+    cameraFacingMode = preferredFacing || cameraFacingMode || 'environment';
     const nowTime = getBangkokNowParts().timeString.slice(0, 5);
     const timeInp = document.getElementById('inpCheckoutTime');
     if (timeInp) {
@@ -1891,30 +2039,40 @@
       detectCheckoutLocation(true);
     }
 
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (isMobile) {
-      const camInput = document.getElementById('inpCameraFile');
-      if (camInput) {
-        camInput.click();
-        return;
-      }
-    }
+    stopLiveCamera();
 
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       try {
-        cameraMediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+        cameraMediaStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: cameraFacingMode } },
+          audio: false
+        });
         const box = document.getElementById('liveCameraBox');
         const video = document.getElementById('liveCameraVideo');
+        const lbl = document.getElementById('cameraFacingLabel');
         if (box && video) {
           box.classList.remove('hidden');
           video.srcObject = cameraMediaStream;
+          video.style.transform = cameraFacingMode === 'user' ? 'scaleX(-1)' : 'none';
+          if (lbl) {
+            lbl.textContent = cameraFacingMode === 'user' ? '🤳 โหมด: กล้องหน้า' : '📷 โหมด: กล้องหลัง';
+          }
           return;
         }
       } catch (err) {}
     }
 
-    const camInput = document.getElementById('inpCameraFile');
-    if (camInput) camInput.click();
+    const fallbackInputId = cameraFacingMode === 'user' ? 'inpCameraFileFront' : 'inpCameraFileRear';
+    const camInput = document.getElementById(fallbackInputId);
+    if (camInput) {
+      camInput.value = '';
+      camInput.click();
+    }
+  }
+
+  async function toggleCameraFacing() {
+    const nextMode = cameraFacingMode === 'environment' ? 'user' : 'environment';
+    await openCameraCapture(nextMode);
   }
 
   async function snapFromLiveCamera() {
@@ -1924,7 +2082,14 @@
     canvas.width = video.videoWidth || 640;
     canvas.height = video.videoHeight || 480;
     const ctx = canvas.getContext('2d');
+    if (cameraFacingMode === 'user') {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    if (cameraFacingMode === 'user') {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
     const rawDataUrl = canvas.toDataURL('image/jpeg', 0.85);
     stopLiveCamera();
     currentPhoto = await stampPhotoWithTimeAndLocation(rawDataUrl);
@@ -1935,6 +2100,7 @@
 
   function closeDaySheet() {
     stopLiveCamera();
+    currentPhoto = '';
     document.getElementById('daySheet').classList.remove('open');
     renderApp();
   }
@@ -1974,6 +2140,7 @@
     const reader = new FileReader();
     reader.onload = async (ev) => {
       currentPhoto = await stampPhotoWithTimeAndLocation(ev.target.result);
+      e.target.value = '';
       updateCheckoutPhotoPreview();
       validateForm();
       showToast(`แนบรูปพร้อมประทับเวลา (${getCheckoutTimeLabel()}) และสถานที่ GPS แล้ว 📸`);
@@ -2059,6 +2226,10 @@
 
   function clearPhoto() {
     currentPhoto = '';
+    ['inpPhotoFile', 'inpCameraFileRear', 'inpCameraFileFront'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
     updateCheckoutPhotoPreview();
     validateForm();
   }
@@ -2177,6 +2348,7 @@
       showToast(`ส่งคำขอลาพักร้อนของ ${owner.firstName} (${formatThaiShort(lfr)} – ${formatThaiShort(lto)}) ไปที่ ${APPROVER_ID} แล้ว ✓`);
     }
 
+    currentPhoto = '';
     closeDaySheet();
   }
 
@@ -2187,6 +2359,7 @@
     allCloudCalendarItems = allCloudCalendarItems.filter(
       it => !((it.empId || '').toUpperCase() === empId && it.dateKey === currentDateKey)
     );
+    currentPhoto = '';
     window.persistLocalDatabase();
     window.cloudStore?.deleteCalendarItem(empId, currentDateKey);
     showToast('ลบรายการเรียบร้อยแล้ว');
@@ -2624,9 +2797,11 @@
     const idx = state.teamRequests.findIndex(r => r.id === reqId);
     if (idx === -1) return;
     const removed = state.teamRequests[idx];
+    deletedRequestIds.add(reqId);
     state.teamRequests.splice(idx, 1);
 
     const empUpper = (removed.empId || '').trim().toUpperCase();
+    deletedCalendarDocIds.add(`${empUpper}_${removed.from}`);
     allCloudCalendarItems = allCloudCalendarItems.filter(
       it => !((it.empId || '').toUpperCase() === empUpper && it.dateKey === removed.from)
     );
@@ -2681,11 +2856,15 @@
     const target = registeredAccounts[cleanId];
     const targetName = target ? `${target.firstName} ${target.lastName}`.trim() : cleanId;
 
+    deletedAccountIds.add(cleanId);
     delete registeredAccounts[cleanId];
 
     const removedReqs = state.teamRequests.filter(r => (r.empId || '').trim().toUpperCase() === cleanId);
+    removedReqs.forEach(r => deletedRequestIds.add(r.id));
     state.teamRequests = state.teamRequests.filter(r => (r.empId || '').trim().toUpperCase() !== cleanId);
 
+    const removedCal = allCloudCalendarItems.filter(it => (it.empId || '').trim().toUpperCase() === cleanId);
+    removedCal.forEach(it => deletedCalendarDocIds.add(`${cleanId}_${it.dateKey}`));
     allCloudCalendarItems = allCloudCalendarItems.filter(
       it => (it.empId || '').trim().toUpperCase() !== cleanId
     );
@@ -2699,6 +2878,7 @@
     window.persistLocalDatabase();
     window.cloudStore?.deleteAccount(cleanId);
     removedReqs.forEach(r => window.cloudStore?.deleteRequest(r.id));
+    removedCal.forEach(it => window.cloudStore?.deleteCalendarItem(cleanId, it.dateKey));
 
     showToast(`ลบบัญชี ${targetName} (${cleanId}) และคำขอทั้งหมดแล้ว`);
     renderApp();
