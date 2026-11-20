@@ -444,7 +444,7 @@
 
       <div class="flex items-center justify-between gap-2 text-[11px] bg-[#262259] border border-[#4c4694] rounded-2xl px-3 py-2">
         <span class="text-[#c7c3ea] shrink-0">☁️ ฐานข้อมูลกลาง:</span>
-        <span id="cloudSyncStatusText" class="text-[#36c78c] font-bold text-right">พร้อมใช้งาน · ซิงค์อัตโนมัติ ✓</span>
+        <span id="cloudSyncStatusText" class="text-[#36c78c] font-bold text-right">กำลังเชื่อมต่อฐานข้อมูลกลาง...</span>
       </div>
 
       <button type="button" id="btnAuthSubmit" onclick="handleLogin()" class="comic-btn w-full py-3.5 bg-[#ffb98a] text-[#1e1b4b] text-base mt-1">
@@ -478,106 +478,204 @@
 
   <!-- Photo Lightbox -->
   <div class="sheet-backdrop" id="photoViewer" onclick="closePhotoViewer()" style="justify-content:center; padding:18px; z-index:65;">
-<!-- Cross-Device Centralized Cloud Database Sync (Multi-Node Cloud + Firebase + LocalStorage) -->
+    <div class="comic-card p-3 bg-white max-w-full" onclick="event.stopPropagation()">
+      <img id="photoViewerImg" src="" class="w-full max-h-[65vh] object-contain rounded-2xl border-2 border-[#1e1b4b]" alt="หลักฐานเช็คเอาท์" />
+      <div id="photoViewerMeta" class="mt-2 px-2 py-1.5 rounded-xl bg-[#f6f5ff] border border-[#1e1b4b] text-xs font-bold text-[#1e1b4b]"></div>
+      <button type="button" onclick="closePhotoViewer()" class="comic-btn w-full py-2.5 bg-[#ffb98a] text-sm mt-2.5">ปิดรูปภาพ</button>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast-pill" id="toastPill"></div>
+</div>
+
+<!-- Cross-Device Centralized Cloud Database Sync (Real Persistent JSONBlob + Firebase + LocalStorage) -->
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
   import { getAuth, signInAnonymously, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
   import { getFirestore, doc, setDoc, deleteDoc, collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
   const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-  const appId = typeof __app_id !== 'undefined' ? __app_id : 'oto-ot-leave-shared-v6';
+  const appId = typeof __app_id !== 'undefined' ? __app_id : 'oto-ot-leave-shared-v7';
 
-  // ช่องทางฐานข้อมูลกลางที่รองรับ CORS 100% (Firebase Realtime DB Public Sandbox + Custom URL)
-  const DEFAULT_CLOUD_NODES = [
-    'https://oto-shared-sync-default-rtdb.asia-southeast1.firebasedatabase.app/oto_team_state.json',
-    'https://kvdb.io/A9x7kP2mQw8nR4vT6yL1z/oto_team_state_v6'
-  ];
-  const CUSTOM_DB_STORAGE_KEY = 'oto_central_db_url_v2';
+  // ฐานข้อมูลกลาง JSONBlob จริงที่รองรับ CORS จาก Vercel, มือถือ และคอมพิวเตอร์ 100%
+  // ใช้ร่วมกันทุกเครื่องโดยอัตโนมัติ (สามารถสร้างห้องใหม่หรือเชื่อมต่อด้วยรหัสทีมได้)
+  const DEFAULT_SHARED_BLOB_URL = 'https://jsonblob.com/api/jsonBlob/019d3e8f-7a42-7c91-b410-9f8e2c6a1d05';
+  const CUSTOM_DB_STORAGE_KEY = 'oto_central_blob_url_v7';
+  const FALLBACK_KV_URL = 'https://kvdb.io/8kP4nQ9vR2wX7mL3zT5yB/oto_shared_team_v7';
 
   let isSyncingNow = false;
   let lastCloudPushAt = 0;
-  let workingEndpoint = '';
+  let activeCloudUrl = '';
 
-  function getCandidateEndpoints() {
-    const list = [];
+  function resolveCloudUrl() {
     try {
-      const custom = (localStorage.getItem(CUSTOM_DB_STORAGE_KEY) || '').trim();
-      if (custom && custom.startsWith('http')) {
-        list.push(custom.endsWith('.json') || !custom.includes('firebaseio.com') ? custom : `${custom.replace(/\/$/, '')}/oto_team_state.json`);
-      }
+      const saved = (localStorage.getItem(CUSTOM_DB_STORAGE_KEY) || '').trim();
+      if (saved && saved.startsWith('http')) return saved;
     } catch (e) {}
-    if (workingEndpoint && !list.includes(workingEndpoint)) list.push(workingEndpoint);
-    DEFAULT_CLOUD_NODES.forEach(u => {
-      if (!list.includes(u)) list.push(u);
-    });
-    return list;
+    return activeCloudUrl || DEFAULT_SHARED_BLOB_URL;
   }
+
+  window.getCurrentCloudEndpoint = () => resolveCloudUrl();
 
   window.setCustomCloudEndpoint = async function(newUrl) {
     const clean = (newUrl || '').trim();
-    workingEndpoint = '';
     try {
       if (clean) localStorage.setItem(CUSTOM_DB_STORAGE_KEY, clean);
       else localStorage.removeItem(CUSTOM_DB_STORAGE_KEY);
     } catch (e) {}
+    activeCloudUrl = clean || DEFAULT_SHARED_BLOB_URL;
     await window.cloudStore.pushAllLocalToCloud();
     await window.cloudStore.pullFromCloud(true);
   };
 
-  window.getCurrentCloudEndpoint = () => getCandidateEndpoints()[0] || DEFAULT_CLOUD_NODES[0];
+  // สร้างฐานข้อมูลกลางชุดใหม่และรับลิงก์/รหัสแชร์ให้เครื่องอื่นเชื่อมต่อได้ทันที
+  window.createNewSharedCloudRoom = async function() {
+    try {
+      const snap = typeof window.getAllLocalSyncSnapshot === 'function'
+        ? window.getAllLocalSyncSnapshot()
+        : { accounts: {}, requests: [], calendar: [] };
+      const initialPayload = buildMergedPayload({}, snap);
 
-  function updateCloudStatusBadge(text, ok = true) {
+      const res = await fetch('https://jsonblob.com/api/jsonBlob', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(initialPayload)
+      });
+
+      if (res.ok) {
+        const loc = res.headers.get('Location') || res.headers.get('location') || '';
+        const blobId = loc.split('/').pop();
+        if (blobId) {
+          const newUrl = `https://jsonblob.com/api/jsonBlob/${blobId}`;
+          await window.setCustomCloudEndpoint(newUrl);
+          return newUrl;
+        }
+      }
+    } catch (e) {
+      console.warn('Create room error:', e);
+    }
+    return '';
+  };
+
+  function updateCloudStatusBadge(text, stateLevel = 'ok') {
     const el = document.getElementById('cloudSyncStatusText');
     if (el) {
       el.textContent = text;
-      el.className = ok ? 'text-[#36c78c] font-bold text-right' : 'text-[#ffb98a] font-bold text-right';
+      el.className = stateLevel === 'ok'
+        ? 'text-[#36c78c] font-bold text-right'
+        : stateLevel === 'syncing'
+          ? 'text-[#d9f0ff] font-bold text-right'
+          : 'text-[#ffb98a] font-bold text-right';
     }
     const headerBadge = document.getElementById('headerSyncBtn');
     if (headerBadge) {
-      headerBadge.textContent = ok ? '☁️ ซิงค์แล้ว' : '🔄 ซิงค์';
-      headerBadge.style.background = ok ? '#c6f3dc' : '#fff0c2';
+      headerBadge.textContent = stateLevel === 'ok'
+        ? '☁️ ออนไลน์ ✓'
+        : stateLevel === 'syncing'
+          ? '⏳ กำลังซิงค์...'
+          : '⚠️ ออฟไลน์';
+      headerBadge.style.background = stateLevel === 'ok'
+        ? '#c6f3dc'
+        : stateLevel === 'syncing'
+          ? '#d9f0ff'
+          : '#ffd6e0';
     }
   }
 
+  async function ensureJsonBlobReady(url) {
+    try {
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+        cache: 'no-store'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return { ok: true, data };
+      }
+      if (res.status === 404 && url.includes('jsonblob.com/api/jsonBlob/')) {
+        // หาก Blob เริ่มต้นหมดอายุ ให้สร้าง Blob ใหม่แล้วบันทึกลง KVdb กลางเพื่อให้ทุกเครื่องเห็น URL เดียวกัน
+        const created = await window.createNewSharedCloudRoom();
+        if (created) {
+          try {
+            await fetch(FALLBACK_KV_URL, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ activeBlobUrl: created, updatedAt: Date.now() })
+            });
+          } catch (e) {}
+          const retryRes = await fetch(created, { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
+          if (retryRes.ok) return { ok: true, data: await retryRes.json() };
+        }
+      }
+    } catch (e) {}
+    return { ok: false, data: null };
+  }
+
   async function readCentralCloudState() {
-    const endpoints = getCandidateEndpoints();
-    for (const ep of endpoints) {
+    // ตรวจสอบว่ามี URL กลางล่าสุดใน KVdb หรือไม่ (กรณีไม่ตั้งค่า Custom URL เอง)
+    let targetUrl = resolveCloudUrl();
+    const hasCustom = Boolean((localStorage.getItem(CUSTOM_DB_STORAGE_KEY) || '').trim());
+
+    if (!hasCustom) {
       try {
-        const res = await fetch(`${ep}${ep.includes('?') ? '&' : '?'}_t=${Date.now()}`, {
+        const kvRes = await fetch(`${FALLBACK_KV_URL}?_t=${Date.now()}`, {
           method: 'GET',
           headers: { 'Accept': 'application/json' },
           cache: 'no-store'
         });
-        if (res.ok) {
-          const data = await res.json();
-          workingEndpoint = ep;
-          if (data && typeof data === 'object') return data;
-          return { accounts: {}, requests: [], calendar: [], tombstones: {} };
+        if (kvRes.ok) {
+          const kvData = await kvRes.json();
+          if (kvData && typeof kvData.activeBlobUrl === 'string' && kvData.activeBlobUrl.startsWith('http')) {
+            targetUrl = kvData.activeBlobUrl;
+            activeCloudUrl = targetUrl;
+          }
         }
       } catch (e) {}
+    }
+
+    const result = await ensureJsonBlobReady(targetUrl);
+    if (result.ok) {
+      activeCloudUrl = targetUrl;
+      return result.data || { accounts: {}, requests: [], calendar: [], tombstones: {} };
     }
     return null;
   }
 
   async function writeCentralCloudState(payload) {
-    const endpoints = getCandidateEndpoints();
-    for (const ep of endpoints) {
-      try {
-        const res = await fetch(ep, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        if (res.ok) {
-          workingEndpoint = ep;
-          return true;
+    const targetUrl = resolveCloudUrl();
+    try {
+      const res = await fetch(targetUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        activeCloudUrl = targetUrl;
+        const hasCustom = Boolean((localStorage.getItem(CUSTOM_DB_STORAGE_KEY) || '').trim());
+        if (!hasCustom && targetUrl.includes('jsonblob.com')) {
+          fetch(FALLBACK_KV_URL, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ activeBlobUrl: targetUrl, updatedAt: Date.now() })
+          }).catch(() => {});
         }
-      } catch (e) {}
+        return true;
+      }
+    } catch (e) {
+      console.warn('Write cloud error:', e);
     }
     return false;
   }
 
-  function compactImageForCloud(dataUrl, maxLen = 70000) {
+  function compactImageForCloud(dataUrl, maxLen = 45000) {
     if (!dataUrl || typeof dataUrl !== 'string') return '';
     if (dataUrl.length <= maxLen) return dataUrl;
     return '';
@@ -613,7 +711,7 @@
       mergedAccounts[cleanId] = {
         ...val,
         empId: cleanId,
-        avatar: compactImageForCloud(val?.avatar || '', 55000)
+        avatar: compactImageForCloud(val?.avatar || '', 32000)
       };
     });
 
@@ -633,14 +731,14 @@
             ...r,
             empId,
             approverId: 'SM2080797',
-            photo: compactImageForCloud(r.photo, 75000) || prev?.photo || ''
+            photo: compactImageForCloud(r.photo, 45000) || prev?.photo || ''
           });
         }
       }
     });
     const mergedRequests = Array.from(reqMap.values())
       .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-      .slice(0, 80);
+      .slice(0, 60);
 
     const calMap = new Map();
     (Array.isArray(rData.calendar) ? rData.calendar : []).forEach(it => {
@@ -662,12 +760,12 @@
             ...it,
             empId,
             approverId: 'SM2080797',
-            photo: compactImageForCloud(it.photo, 75000) || prev?.photo || ''
+            photo: compactImageForCloud(it.photo, 45000) || prev?.photo || ''
           });
         }
       }
     });
-    const mergedCalendar = Array.from(calMap.values()).slice(0, 140);
+    const mergedCalendar = Array.from(calMap.values()).slice(0, 120);
 
     return {
       updatedAt: Date.now(),
@@ -687,14 +785,14 @@
     pullFromCloud: async (manual = false) => {
       if (isSyncingNow) return;
       isSyncingNow = true;
-      if (manual) updateCloudStatusBadge('⏳ กำลังซิงค์ข้อมูล...', false);
+      if (manual) updateCloudStatusBadge('⏳ กำลังซิงค์ข้อมูล...', 'syncing');
 
       try {
         const remoteData = await readCentralCloudState();
         if (!remoteData) {
-          updateCloudStatusBadge('พร้อมใช้งาน · บันทึกในเครื่อง ✓', true);
+          updateCloudStatusBadge('⚠️ ยังไม่พบการเชื่อมต่อคลาวด์', 'warn');
           if (manual && typeof showToast === 'function') {
-            showToast('โหลดข้อมูลล่าสุดเรียบร้อย ✓');
+            showToast('ไม่สามารถติดต่อฐานข้อมูลกลางได้ กรุณาตรวจอินเทอร์เน็ต');
           }
           return;
         }
@@ -712,9 +810,21 @@
           window.syncCalendarFromCloud(remoteData.calendar);
         }
 
-        updateCloudStatusBadge('ออนไลน์ · ซิงค์ฐานข้อมูลกลางแล้ว ✓', true);
+        // ถ้าในเครื่องนี้มีข้อมูลที่ยังไม่ได้ส่งขึ้นคลาวด์ ให้ดันขึ้นไปรวมทันที (Two-Way Merge)
+        const localSnap = typeof window.getAllLocalSyncSnapshot === 'function' ? window.getAllLocalSyncSnapshot() : null;
+        if (localSnap) {
+          const remoteReqIds = new Set((remoteData.requests || []).map(r => r.id));
+          const hasUnpushedLocal = (localSnap.requests || []).some(r => r?.id && !remoteReqIds.has(r.id)) ||
+            Object.keys(localSnap.accounts || {}).some(k => !(remoteData.accounts || {})[k]);
+          if (hasUnpushedLocal) {
+            const merged = buildMergedPayload(remoteData, localSnap);
+            await writeCentralCloudState(merged);
+          }
+        }
+
+        updateCloudStatusBadge('ออนไลน์ · ซิงค์ตรงกันทุกเครื่อง ✓', 'ok');
         if (manual && typeof showToast === 'function') {
-          showToast('ซิงค์ข้อมูลตรงกันทุกเครื่อง (คอมฯ ↔ มือถือ) เรียบร้อย ☁️✓');
+          showToast('ซิงค์ฐานข้อมูลกลางตรงกันทุกเครื่อง (มือถือ ↔ คอมฯ) แล้ว ☁️✓');
         }
       } finally {
         isSyncingNow = false;
@@ -724,6 +834,7 @@
     pushAllLocalToCloud: async () => {
       if (typeof window.getAllLocalSyncSnapshot !== 'function') return false;
       lastCloudPushAt = Date.now();
+      updateCloudStatusBadge('⏳ กำลังส่งข้อมูลขึ้นคลาวด์...', 'syncing');
       const localSnap = window.getAllLocalSyncSnapshot();
       const remoteData = await readCentralCloudState();
       const merged = buildMergedPayload(remoteData, localSnap);
@@ -733,7 +844,7 @@
       }
 
       const ok = await writeCentralCloudState(merged);
-      updateCloudStatusBadge(ok ? 'ออนไลน์ · ซิงค์ฐานข้อมูลกลางแล้ว ✓' : 'พร้อมใช้งาน · บันทึกในเครื่อง ✓', true);
+      updateCloudStatusBadge(ok ? 'ออนไลน์ · ซิงค์ตรงกันทุกเครื่อง ✓' : '⚠️ ส่งขึ้นคลาวด์ไม่สำเร็จ (เก็บในเครื่องแล้ว)', ok ? 'ok' : 'warn');
       return ok;
     },
 
@@ -748,7 +859,7 @@
           firstName: acc.firstName || '',
           lastName: acc.lastName || '',
           password: acc.password || '',
-          avatar: compactImageForCloud(acc.avatar || '', 55000)
+          avatar: compactImageForCloud(acc.avatar || '', 32000)
         });
       }
     },
@@ -770,7 +881,7 @@
       if (window.cloudStore.user && window.cloudStore.db) {
         await setDoc(doc(window.cloudStore.db, 'artifacts', appId, 'public', 'data', 'oto_requests', req.id), {
           ...req,
-          photo: compactImageForCloud(req.photo || '', 75000),
+          photo: compactImageForCloud(req.photo || '', 45000),
           approverId: 'SM2080797',
           updatedAt: req.updatedAt || Date.now()
         });
@@ -795,7 +906,7 @@
       if (window.cloudStore.user && window.cloudStore.db) {
         await setDoc(doc(window.cloudStore.db, 'artifacts', appId, 'public', 'data', 'oto_calendar_items', docId), {
           ...item,
-          photo: compactImageForCloud(item.photo || '', 75000),
+          photo: compactImageForCloud(item.photo || '', 45000),
           dateKey,
           empId: empKey
         });
@@ -821,7 +932,7 @@
       if (Date.now() - lastCloudPushAt > 2500) {
         window.cloudStore.pullFromCloud(false);
       }
-    }, 4000);
+    }, 3500);
 
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
@@ -849,7 +960,7 @@
       window.cloudStore.auth = auth;
       window.cloudStore.user = currentUser;
       window.cloudStore.ready = true;
-      updateCloudStatusBadge('ออนไลน์ · ซิงค์ฐานข้อมูลกลางแล้ว ✓', true);
+      updateCloudStatusBadge('ออนไลน์ · ซิงค์ตรงกันทุกเครื่อง ✓', 'ok');
 
       const accountsCol = collection(db, 'artifacts', appId, 'public', 'data', 'oto_accounts');
       const requestsCol = collection(db, 'artifacts', appId, 'public', 'data', 'oto_requests');
@@ -1474,7 +1585,6 @@
       return;
     }
 
-    // ดึงข้อมูลบัญชีล่าสุดจากฐานข้อมูลกลางก่อนตรวจรหัสผ่าน เพื่อรองรับรหัสที่สมัครจากอีกเครื่อง
     if (!registeredAccounts[empId] && window.cloudStore?.pullFromCloud) {
       await window.cloudStore.pullFromCloud(false);
     }
@@ -1567,7 +1677,7 @@
             ${manager ? `ผู้อนุมัติ · ${APPROVER_ID}` : state.user.empId}
           </span>
           <button type="button" id="headerSyncBtn" onclick="window.cloudStore?.pullFromCloud(true)" class="px-2 py-0.5 rounded-full text-[10px] font-bold border border-[#1e1b4b] bg-[#c6f3dc] active:scale-95" title="กดเพื่อซิงค์ข้อมูลล่าสุดจากฐานข้อมูลกลาง">
-            ☁️ ซิงค์แล้ว
+            ☁️ ออนไลน์ ✓
           </button>
         </div>
         <button onclick="switchTab('prof')" class="w-11 h-11 rounded-full border-2 border-[#1e1b4b] bg-[#ffe3ec] flex items-center justify-center shadow-sm active:scale-95 transition overflow-hidden" title="แก้ไขรูปโปรไฟล์">
@@ -1925,7 +2035,7 @@
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
-        const maxW = 720;
+        const maxW = 540;
         const scale = img.width > maxW ? maxW / img.width : 1;
         const w = Math.round(img.width * scale);
         const h = Math.round(img.height * scale);
@@ -1941,59 +2051,59 @@
         const thaiDateText = formatThaiFull(currentDateKey || bkk.dateKey);
         const locText = getCheckoutLocationLabel();
 
-        const padX = Math.max(14, Math.round(w * 0.032));
-        const baseFont = Math.max(14, Math.round(w * 0.032));
-        const timeFont = Math.max(22, Math.round(w * 0.056));
-        const tagFont = Math.max(14, Math.round(w * 0.034));
+        const padX = Math.max(12, Math.round(w * 0.032));
+        const baseFont = Math.max(12, Math.round(w * 0.032));
+        const timeFont = Math.max(18, Math.round(w * 0.056));
+        const tagFont = Math.max(12, Math.round(w * 0.034));
 
         ctx.font = `600 ${baseFont}px Anuphan, sans-serif`;
-        const locLines = wrapCanvasLines(ctx, locText, w - padX * 2 - 22);
+        const locLines = wrapCanvasLines(ctx, locText, w - padX * 2 - 20);
         const lineHeight = Math.round(baseFont * 1.38);
 
         const badgeH = Math.round(timeFont * 1.38);
-        const totalBlockH = badgeH + 14 + lineHeight + (locLines.length * lineHeight) + 28;
-        const startY = Math.max(16, h - totalBlockH - Math.round(h * 0.035));
+        const totalBlockH = badgeH + 12 + lineHeight + (locLines.length * lineHeight) + 24;
+        const startY = Math.max(14, h - totalBlockH - Math.round(h * 0.035));
 
-        const grad = ctx.createLinearGradient(0, startY - 24, 0, h);
+        const grad = ctx.createLinearGradient(0, startY - 20, 0, h);
         grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
         grad.addColorStop(0.28, 'rgba(0, 0, 0, 0.42)');
         grad.addColorStop(1, 'rgba(0, 0, 0, 0.72)');
         ctx.fillStyle = grad;
-        ctx.fillRect(0, startY - 24, w, h - (startY - 24));
+        ctx.fillRect(0, startY - 20, w, h - (startY - 20));
 
         ctx.font = `700 ${tagFont}px Kanit, sans-serif`;
         const tagText = 'เช็กเอาท์';
-        const tagBoxW = Math.round(ctx.measureText(tagText).width + 20);
-        const tagBoxH = Math.round(badgeH - 10);
+        const tagBoxW = Math.round(ctx.measureText(tagText).width + 18);
+        const tagBoxH = Math.round(badgeH - 8);
 
         ctx.font = `700 ${timeFont}px Kanit, sans-serif`;
-        const timeW = Math.round(ctx.measureText(rawTime).width + 24);
-        const pillW = tagBoxW + timeW + 14;
+        const timeW = Math.round(ctx.measureText(rawTime).width + 20);
+        const pillW = tagBoxW + timeW + 12;
 
-        drawRoundedRectPath(ctx, padX, startY, pillW, badgeH, 10);
+        drawRoundedRectPath(ctx, padX, startY, pillW, badgeH, 9);
         ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
         ctx.fill();
 
-        drawRoundedRectPath(ctx, padX + 5, startY + 5, tagBoxW, tagBoxH, 7);
+        drawRoundedRectPath(ctx, padX + 4, startY + 4, tagBoxW, tagBoxH, 6);
         ctx.fillStyle = '#FBBF24';
         ctx.fill();
 
         ctx.fillStyle = '#111827';
         ctx.font = `700 ${tagFont}px Kanit, sans-serif`;
-        ctx.fillText(tagText, padX + 14, startY + 5 + Math.round(tagBoxH * 0.72));
+        ctx.fillText(tagText, padX + 12, startY + 4 + Math.round(tagBoxH * 0.72));
 
         ctx.fillStyle = '#0F172A';
         ctx.font = `700 ${timeFont}px Kanit, sans-serif`;
-        ctx.fillText(rawTime, padX + tagBoxW + 14, startY + Math.round(badgeH * 0.76));
+        ctx.fillText(rawTime, padX + tagBoxW + 12, startY + Math.round(badgeH * 0.76));
 
-        const detailsTop = startY + badgeH + 12;
+        const detailsTop = startY + badgeH + 10;
         const detailsHeight = lineHeight + (locLines.length * lineHeight);
         ctx.fillStyle = '#FBBF24';
-        ctx.fillRect(padX, detailsTop, 5, detailsHeight);
+        ctx.fillRect(padX, detailsTop, 4, detailsHeight);
 
-        const textX = padX + 14;
+        const textX = padX + 12;
         ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
-        ctx.shadowBlur = 6;
+        ctx.shadowBlur = 5;
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 1;
 
@@ -2006,12 +2116,12 @@
           ctx.fillText(ln, textX, detailsTop + lineHeight * (idx + 1) + Math.round(baseFont * 0.95));
         });
 
-        ctx.font = `500 ${Math.max(11, Math.round(baseFont * 0.78))}px Anuphan, sans-serif`;
+        ctx.font = `500 ${Math.max(10, Math.round(baseFont * 0.78))}px Anuphan, sans-serif`;
         ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
         ctx.fillText('✓ oto GPS & Time Verified', padX, detailsTop + detailsHeight + Math.round(baseFont * 1.1));
 
         ctx.shadowColor = 'transparent';
-        resolve(canvas.toDataURL('image/jpeg', 0.68));
+        resolve(canvas.toDataURL('image/jpeg', 0.56));
       };
       img.onerror = () => resolve(dataUrl);
       img.src = dataUrl;
@@ -2861,7 +2971,7 @@
           <div class="comic-card p-6 text-center">
             <div class="flex justify-center mb-2">${renderMoodSvg('happy', 52)}</div>
             <div class="text-base font-bold">เคลียร์ครบทุกรายการแล้ว!</div>
-            <p class="text-xs text-[#7a76a3] mt-1">กดปุ่ม <b>☁️ ซิงค์แล้ว</b> ด้านบนเพื่อดึงคำขอล่าสุดจากเครื่องพนักงานได้ทันที</p>
+            <p class="text-xs text-[#7a76a3] mt-1">กดปุ่ม <b>☁️ ออนไลน์ ✓</b> ด้านบนเพื่อดึงคำขอล่าสุดจากเครื่องพนักงานได้ทันที</p>
             <div class="flex items-center justify-center gap-2 mt-3">
               <button type="button" onclick="window.cloudStore?.pullFromCloud(true)" class="comic-btn px-3.5 py-2 bg-[#e5e2ff] text-xs">🔄 ดึงข้อมูลล่าสุด</button>
               <button type="button" onclick="setApprovalSubTab('history')" class="comic-btn px-3.5 py-2 bg-[#c6f3dc] text-xs">ดูประวัติ →</button>
@@ -3035,7 +3145,7 @@
   }
 
   // =========================================================================
-  // Tab 4: โปรไฟล์ (Profile) + ลบบัญชีพนักงานสำหรับ SM + ตั้งค่าฐานข้อมูลกลาง
+  // Tab 4: โปรไฟล์ (Profile) + ลบบัญชีพนักงานสำหรับ SM + เชื่อมต่อห้องซิงค์กลาง
   // =========================================================================
   let pendingDeleteEmpId = '';
 
@@ -3148,10 +3258,27 @@
     renderApp();
   }
 
-  function saveCustomCloudUrlFromUi() {
+  async function saveCustomCloudUrlFromUi() {
     const inp = document.getElementById('inpCloudDbUrl');
     if (!inp) return;
-    window.setCustomCloudEndpoint?.(inp.value);
+    await window.setCustomCloudEndpoint?.(inp.value);
+    renderApp();
+  }
+
+  async function createAndCopySharedRoom() {
+    showToast('กำลังสร้างห้องฐานข้อมูลกลางและรวมข้อมูล...');
+    const newUrl = await window.createNewSharedCloudRoom?.();
+    if (newUrl) {
+      try {
+        await navigator.clipboard.writeText(newUrl);
+        showToast('สร้างห้องฐานข้อมูลกลางและคัดลอกลิงก์แล้ว ✓ นำไปวางในอีกเครื่องได้เลย');
+      } catch (e) {
+        showToast('สร้างห้องฐานข้อมูลกลางสำเร็จ ✓');
+      }
+      renderApp();
+    } else {
+      showToast('ไม่สามารถสร้างห้องได้ กรุณาตรวจสอบอินเทอร์เน็ต');
+    }
   }
 
   function renderProfileTab(container) {
@@ -3225,8 +3352,11 @@
         </div>
 
         <div class="comic-card p-4 mb-3 bg-[#f6f5ff]">
-          <div class="text-xs font-bold mb-1">☁️ ฐานข้อมูลกลาง (Centralized Cloud Sync)</div>
-          <p class="text-[11px] text-[#7a76a3] mb-2">ทุกเครื่องที่เปิดลิงก์เดียวกันจะซิงค์ผ่าน URL ฐานข้อมูลกลางนี้โดยอัตโนมัติ</p>
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs font-bold">☁️ ห้องฐานข้อมูลกลาง (มือถือ ↔ คอมฯ)</span>
+            <button type="button" onclick="createAndCopySharedRoom()" class="text-[10px] font-bold text-[#5b4ce6] underline">+ สร้างห้องใหม่ & คัดลอก</button>
+          </div>
+          <p class="text-[11px] text-[#7a76a3] mb-2">ใช้ URL เดียวกันทั้งในมือถือและคอมพิวเตอร์ เพื่อให้ข้อมูลตรงกัน 100%</p>
           <input id="inpCloudDbUrl" type="text" class="comic-input text-[11px] py-2 mb-2" value="${activeDbUrl}" />
           <div class="grid grid-cols-2 gap-2">
             <button type="button" onclick="window.cloudStore?.pushAllLocalToCloud().then(()=>window.cloudStore?.pullFromCloud(true))" class="comic-pill py-1.5 text-xs bg-[#c6f3dc] font-bold">🔄 ซิงค์ขึ้น-ลงเดี๋ยวนี้</button>
