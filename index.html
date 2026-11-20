@@ -222,13 +222,27 @@
         </div>
 
         <div class="mb-2">
-          <label class="block text-xs font-semibold text-[#d6d1ff] mb-1">รหัสพนักงาน / รหัสผู้อนุมัติ</label>
-          <input id="inpEmpId" oninput="onAuthEmpIdChange()" class="comic-input !mb-0" placeholder="เช่น EMP-0231 หรือ SM2080797">
+          <label class="block text-xs font-semibold text-[#d6d1ff] mb-1">ใส่รหัสพนักงาน</label>
+          <input id="inpEmpId" oninput="onAuthEmpIdChange()" class="comic-input !mb-0" placeholder="ใส่รหัสพนักงาน">
         </div>
 
         <!-- แถบแจ้งเตือนเมื่อกรอกรหัสผู้อนุมัติ SM2080797 (ไม่ต้องกรอกชื่อ) -->
-        <div id="smBadgeHint" class="hidden mb-2 bg-[#c9f7e2] text-[#115c33] border-2 border-[#19143c] rounded-xl px-3 py-1.5 text-[11px] font-bold">
-          🛡️ ผู้อนุมัติหลัก: นาย ณัฐวุฒิ ชุมหิรัญ (ไม่ต้องกรอกชื่อ ใส่รหัสผ่านได้เลย)
+        <div id="smBadgeHint" class="hidden mb-2 bg-[#c9f7e2] text-[#115c33] border-2 border-[#19143c] rounded-xl px-3 py-2 text-[11px] font-bold space-y-1.5">
+          <div>🛡️ ผู้อนุมัติหลัก: นาย ณัฐวุฒิ ชุมหิรัญ (รหัสผ่านเริ่มต้น: <span class="underline">2080797</span>)</div>
+          <div class="flex flex-wrap gap-1.5 pt-0.5">
+            <button type="button" onclick="quickEnterSM()" class="px-2.5 py-1 rounded-full bg-[#19143c] text-white text-[10px] font-bold cursor-pointer">
+              ⚡ กรอกรหัสและเข้าใช้งาน SM ทันที
+            </button>
+            <button type="button" onclick="openResetSMPassword()" class="px-2.5 py-1 rounded-full bg-white text-[#19143c] border border-[#19143c] text-[10px] font-bold cursor-pointer">
+              🔄 รีรหัสผ่าน SM
+            </button>
+          </div>
+          <div id="resetSMBox" class="hidden pt-1.5 border-t border-[#115c33]/25 space-y-1.5">
+            <input id="inpNewSMPass" type="text" class="comic-input !py-1.5 !text-xs" placeholder="ตั้งรหัสผ่านใหม่สำหรับ SM2080797">
+            <button type="button" onclick="confirmResetSMPassword()" class="w-full py-1.5 rounded-full bg-[#ffb98a] text-[#19143c] border border-[#19143c] text-[11px] font-bold cursor-pointer">
+              ✓ บันทึกรหัสผ่านใหม่และเข้าสู่ระบบ
+            </button>
+          </div>
         </div>
 
         <!-- ช่องชื่อ-นามสกุล (แสดงเฉพาะตอนกด "สร้างรหัสพนักงาน" ใหม่เท่านั้น ตอนเข้าสู่ระบบไม่ต้องกรอก) -->
@@ -833,6 +847,14 @@
   const APPROVER_PASS = '2080797';
   const APPROVER_NAME = { firstName: 'นาย ณัฐวุฒิ', lastName: 'ชุมหิรัญ' };
 
+  function getSavedApproverPassword() {
+    try {
+      return (localStorage.getItem('oto_sm_pass') || APPROVER_PASS).trim();
+    } catch (e) {
+      return APPROVER_PASS;
+    }
+  }
+
   function renderMoodSvg(idx) {
     return MOODS[idx % MOODS.length]?.svg || MOODS[0].svg;
   }
@@ -993,10 +1015,17 @@
     const helperTxt = document.getElementById('authHelperText');
 
     if (empVal === APPROVER_ID) {
+      if (authMode !== 'login') {
+        authMode = 'login';
+        document.getElementById('tabAuthLogin').className = 'py-2 px-3 rounded-full border-2 border-[#19143c] bg-[#ffb98a] text-[#19143c] font-bold text-xs cursor-pointer shadow-[0_3px_0_#2d2666]';
+        document.getElementById('tabAuthRegister').className = 'py-2 px-3 rounded-full border-2 border-white/25 bg-white/10 text-white font-bold text-xs cursor-pointer';
+        document.getElementById('btnAuthSubmit').textContent = 'เข้าใช้งานระบบ';
+        document.getElementById('btnAuthSubmit').className = 'comic-btn w-full py-3 bg-[#ffb98a] text-[#19143c] text-sm';
+      }
       nameWrap.classList.add('hidden');
       smHint.classList.remove('hidden');
       lblPass.textContent = 'รหัสผ่านผู้อนุมัติ (SM2080797)';
-      helperTxt.innerHTML = `* ผู้อนุมัติหลัก <b>${APPROVER_NAME.firstName} ${APPROVER_NAME.lastName}</b> กรอกรหัสผ่านเพื่อเข้าใช้งาน`;
+      helperTxt.innerHTML = `* ผู้อนุมัติหลัก <b>${APPROVER_NAME.firstName} ${APPROVER_NAME.lastName}</b> กรอกรหัสผ่าน <b>${getSavedApproverPassword()}</b> หรือกดปุ่มด้านบนได้เลย`;
     } else if (authMode === 'register') {
       smHint.classList.add('hidden');
       nameWrap.classList.remove('hidden');
@@ -1019,57 +1048,48 @@
     document.getElementById('inpFirst').value = state.user?.firstName || '';
     document.getElementById('inpLast').value = state.user?.lastName || '';
     document.getElementById('inpEmpId').value = state.user?.empId || '';
-    document.getElementById('inpPassword').value = isManager() ? APPROVER_PASS : (registeredAccounts[state.user?.empId]?.password || '');
+    document.getElementById('inpPassword').value = isManager() ? getSavedApproverPassword() : (registeredAccounts[state.user?.empId]?.password || '');
     onAuthEmpIdChange();
     document.getElementById('loginScreen').classList.remove('hidden');
   }
 
-  function quickSwitch(asSM) {
-    if (asSM) {
-      state.user = {
-        firstName: APPROVER_NAME.firstName,
-        lastName: APPROVER_NAME.lastName,
-        empId: APPROVER_ID
-      };
-      state.activeTab = 'app';
-      showToast(`สลับเป็นผู้อนุมัติ ${APPROVER_NAME.firstName} (${APPROVER_ID})`);
-    } else {
-      const firstEmp = Object.values(registeredAccounts)[0];
-      if (!firstEmp) {
-        openLoginScreen();
-        setAuthMode('register');
-        return;
-      }
-      state.user = {
-        firstName: firstEmp.firstName,
-        lastName: firstEmp.lastName,
-        empId: firstEmp.empId
-      };
-      state.activeTab = 'cal';
-      showToast(`สลับเป็นพนักงาน ${firstEmp.firstName} (${firstEmp.empId})`);
-    }
-    document.getElementById('loginScreen').classList.add('hidden');
-    closeDaySheet();
-    closeApprovalDetail();
-    renderApp();
+  function quickEnterSM() {
+    const savedPass = getSavedApproverPassword();
+    document.getElementById('inpEmpId').value = APPROVER_ID;
+    document.getElementById('inpPassword').value = savedPass;
+    handleLogin();
   }
 
-  function fillDemoLogin(asSM) {
-    setAuthMode('login');
-    if (asSM) {
-      document.getElementById('inpEmpId').value = APPROVER_ID;
-      onAuthEmpIdChange();
-      document.getElementById('inpPassword').value = APPROVER_PASS;
-    } else {
-      document.getElementById('inpEmpId').value = '';
-      onAuthEmpIdChange();
-      document.getElementById('inpPassword').value = '';
+  function openResetSMPassword() {
+    const box = document.getElementById('resetSMBox');
+    if (!box) return;
+    box.classList.toggle('hidden');
+    const inp = document.getElementById('inpNewSMPass');
+    if (inp && !box.classList.contains('hidden')) {
+      inp.value = '';
+      inp.focus();
     }
+  }
+
+  function confirmResetSMPassword() {
+    const newPass = (document.getElementById('inpNewSMPass')?.value || '').trim();
+    if (!newPass) {
+      showToast('กรุณากรอกรหัสผ่านใหม่ที่ต้องการตั้ง');
+      return;
+    }
+    try {
+      localStorage.setItem('oto_sm_pass', newPass);
+    } catch (e) {}
+    document.getElementById('resetSMBox')?.classList.add('hidden');
+    document.getElementById('inpEmpId').value = APPROVER_ID;
+    document.getElementById('inpPassword').value = newPass;
+    showToast(`รีเซ็ตรหัสผ่าน SM2080797 เป็น "${newPass}" เรียบร้อยแล้ว ✓`);
+    handleLogin();
   }
 
   function handleLogin() {
     const empId = document.getElementById('inpEmpId').value.trim().toUpperCase();
-    const password = document.getElementById('inpPassword').value;
+    const password = (document.getElementById('inpPassword').value || '').trim();
 
     if (!empId) {
       showToast('กรุณากรอกรหัสพนักงานหรือรหัสผู้อนุมัติ');
@@ -1078,8 +1098,10 @@
 
     // กรณีผู้อนุมัติ SM2080797 (ไม่ต้องใส่ชื่อ ใช้รหัสผ่านอย่างเดียว)
     if (empId === APPROVER_ID) {
-      if (password !== APPROVER_PASS) {
-        showToast('รหัสผ่านสำหรับ SM2080797 ไม่ถูกต้อง');
+      const savedPass = getSavedApproverPassword();
+      const validPasses = new Set([savedPass, APPROVER_PASS, APPROVER_ID, savedPass.toUpperCase(), password.toUpperCase() === APPROVER_ID ? password : '']);
+      if (!password || !validPasses.has(password)) {
+        showToast(`รหัสผ่านไม่ถูกต้อง (รหัสคือ ${savedPass} หรือกดปุ่ม "🔄 รีรหัสผ่าน SM")`);
         return;
       }
       state.user = {
@@ -1087,6 +1109,7 @@
         lastName: APPROVER_NAME.lastName,
         empId: APPROVER_ID
       };
+      rebuildVisibleCalendarItems();
       state.activeTab = 'app';
       document.getElementById('loginScreen').classList.add('hidden');
       showToast(`ยินดีต้อนรับ ${APPROVER_NAME.firstName} ${APPROVER_NAME.lastName} (${APPROVER_ID})`);
@@ -1465,7 +1488,6 @@
     if (managerMode) {
       const otReqs = state.teamRequests.filter(r => r.type === 'ot' && r.status !== 'rejected');
       const totalTeamOtHours = Math.round(otReqs.reduce((sum, r) => sum + (Number(r.hours) || calcOTHours(r.timeIn, r.timeOut) || 0), 0) * 10) / 10;
-      const totalTeamLeaveDays = state.teamRequests.filter(r => r.type === 'leave' && r.status !== 'rejected').length;
 
       // รวมชั่วโมง OT แยกตามพนักงานแต่ละคน
       const byPersonMap = new Map();
@@ -1497,13 +1519,6 @@
       const wavePoints = sortedDates.length ? sortedDates : [[TODAY, 0]];
       const maxWaveVal = Math.max(2, ...wavePoints.map(([, v]) => v));
 
-      // คำนวณความคืบหน้าวงแหวน (เทียบเป้าทีม 30 ชม.)
-      const targetHours = 30;
-      const pct = Math.min(100, Math.round((totalTeamOtHours / targetHours) * 100));
-      const radius = 44;
-      const circumference = 2 * Math.PI * radius;
-      const dashOffset = circumference - (pct / 100) * circumference;
-
       // สร้างพิกัดกราฟเส้น SVG
       const svgW = 300;
       const svgH = 92;
@@ -1527,7 +1542,7 @@
           <div class="flex items-center justify-between gap-2 mb-2.5">
             <div>
               <span class="text-[10px] font-bold uppercase tracking-wider text-[#ff9955]">TEAM OT ANALYTICS · ${APPROVER_ID}</span>
-              <h3 class="text-base font-bold text-white">กราฟการทำ OT ของทุกคน</h3>
+              <h3 class="text-base font-bold text-white">กราฟการทำ OT ของทุกคน (${totalTeamOtHours} ชม.)</h3>
             </div>
             <div class="flex items-center gap-1.5 flex-none">
               <button type="button" onclick="downloadTeamOtExcel()" class="px-2.5 py-1 rounded-full border border-[#36c78c] bg-[#36c78c]/20 hover:bg-[#36c78c]/35 text-[#7be0b5] text-[10px] font-bold cursor-pointer">
