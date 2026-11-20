@@ -506,6 +506,9 @@
   let lastCloudPushAt = 0;
   let activeCloudUrl = '';
   let lastSyncFingerprint = '';
+  let consecutiveFailures = 0;
+  let ntfyEventSource = null;
+  let pendingPushTimer = null;
 
   function resolveCloudUrl() {
     const custom = (localStorage.getItem(CUSTOM_DB_STORAGE_KEY) || '').trim();
@@ -517,10 +520,59 @@
     return DEFAULT_SHARED_BLOB_URL;
   }
 
+  function applyIncomingPayload(parsed) {
+    if (!parsed || typeof parsed !== 'object') return false;
+    if (!parsed.accounts && !parsed.requests && !parsed.calendar && !parsed.tombstones) return false;
+    const remoteFp = JSON.stringify({
+      a: Object.keys(parsed.accounts || {}).sort(),
+      r: (parsed.requests || []).map(x => `${x.id}:${x.status}:${x.updatedAt || 0}`).sort(),
+      c: (parsed.calendar || []).map(x => `${x.empId || ''}:${x.dateKey}:${x.type}`).sort(),
+      t: parsed.tombstones || {}
+    });
+    let hadDiff = false;
+    if (typeof window.mergeCloudSnapshot === 'function') {
+      hadDiff = window.mergeCloudSnapshot(parsed);
+    }
+    if (hadDiff && remoteFp !== lastSyncFingerprint) {
+      lastSyncFingerprint = remoteFp;
+      scheduleDebouncedPush();
+    } else {
+      lastSyncFingerprint = remoteFp;
+    }
+    return true;
+  }
+
+  function connectNtfyRealtimeStream() {
+    if (ntfyEventSource) {
+      try { ntfyEventSource.close(); } catch (e) {}
+      ntfyEventSource = null;
+    }
+    try {
+      const es = new EventSource(`${NTFY_TOPIC_URL}/sse?since=12h`);
+      ntfyEventSource = es;
+      es.onopen = () => {
+        consecutiveFailures = 0;
+        setCloudBadge('ออนไลน์ · เชื่อมต่อเสถียร ✓', true);
+      };
+      es.onmessage = (event) => {
+        consecutiveFailures = 0;
+        setCloudBadge('ออนไลน์ · เชื่อมต่อเสถียร ✓', true);
+        try {
+          const evt = JSON.parse(event.data);
+          if (evt && evt.message) {
+            const parsed = JSON.parse(evt.message);
+            applyIncomingPayload(parsed);
+          }
+        } catch (e) {}
+      };
+      es.onerror = () => {};
+    } catch (e) {}
+  }
+
   async function readFromNtfyRelay() {
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 3500);
+      const timer = setTimeout(() => controller.abort(), 7500);
       const res = await fetch(`${NTFY_TOPIC_URL}/json?poll=1&since=24h`, {
         method: 'GET',
         cache: 'no-store',
@@ -553,7 +605,7 @@
   async function writeToNtfyRelay(payload) {
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 3500);
+      const timer = setTimeout(() => controller.abort(), 8000);
       const res = await fetch(NTFY_TOPIC_URL, {
         method: 'POST',
         headers: { 'Title': 'oto_sync' },
@@ -573,7 +625,10 @@
 
     if (hasCustom) {
       try {
-        const res = await fetch(targetUrl, { method: 'GET', cache: 'no-store' });
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 7500);
+        const res = await fetch(targetUrl, { method: 'GET', cache: 'no-store', signal: controller.signal });
+        clearTimeout(timer);
         if (res.ok) {
           const data = await res.json();
           if (data && typeof data === 'object') return { ok: true, data };
@@ -609,7 +664,7 @@
     return results.some(Boolean);
   }
 
-  function compactImageForCloud(dataUrl, maxLen = 28000) {
+  function compactImageForCloud(dataUrl, maxLen = 26000) {
     if (!dataUrl || typeof dataUrl !== 'string') return '';
     if (dataUrl.length <= maxLen) return dataUrl;
     return '';
@@ -628,6 +683,13 @@
         ? 'text-[10px] px-2.5 py-0.5 rounded-full bg-[#c6f3dc] border border-[#1e1b4b] font-bold text-[#1e1b4b]'
         : 'text-[10px] px-2.5 py-0.5 rounded-full bg-[#ffd6e0] border border-[#1e1b4b] font-bold text-[#1e1b4b]';
     }
+  }
+
+  function scheduleDebouncedPush() {
+    clearTimeout(pendingPushTimer);
+    pendingPushTimer = setTimeout(() => {
+      if (window.cloudStore) window.cloudStore.pushFullSnapshot();
+    }, 900);
   }
 
   let db = null;
@@ -697,54 +759,55 @@
         const payload = window.cloudStore.buildLocalSnapshot();
         const ok = await writeCentralCloudState(payload);
         if (ok) {
-          setCloudBadge('ออนไลน์ · ซิงค์ข้ามเครื่องแล้ว ✓', true);
+          consecutiveFailures = 0;
+          setCloudBadge('ออนไลน์ · เชื่อมต่อเสถียร ✓', true);
         } else {
-          setCloudBadge('ออฟไลน์ (ข้อมูลเก็บในเครื่อง)', false);
+          consecutiveFailures += 1;
+          if (consecutiveFailures >= 4 || !navigator.onLine) {
+            setCloudBadge('ออฟไลน์ (ข้อมูลเก็บในเครื่อง)', false);
+          }
         }
         return ok;
       } catch (e) {
-        setCloudBadge('ออฟไลน์ (ข้อมูลเก็บในเครื่อง)', false);
+        consecutiveFailures += 1;
+        if (consecutiveFailures >= 4 || !navigator.onLine) {
+          setCloudBadge('ออฟไลน์ (ข้อมูลเก็บในเครื่อง)', false);
+        }
         return false;
       }
     },
 
     pullFromCloud: async (showNotification = false) => {
       if (isSyncingNow) return false;
+      if (!navigator.onLine) {
+        setCloudBadge('ออฟไลน์ (ไม่พบสัญญาณเน็ต)', false);
+        return false;
+      }
       isSyncingNow = true;
       try {
         const res = await readCentralCloudState();
         if (!res.ok) {
-          setCloudBadge('ออฟไลน์ (กำลังลองเชื่อมต่อใหม่...)', false);
+          consecutiveFailures += 1;
+          if (consecutiveFailures >= 4) {
+            setCloudBadge('ออฟไลน์ (กำลังลองเชื่อมต่อใหม่...)', false);
+          }
           return false;
         }
+        consecutiveFailures = 0;
         const remote = res.data || {};
-        setCloudBadge('ออนไลน์ · ซิงค์ข้ามเครื่องแล้ว ✓', true);
+        setCloudBadge('ออนไลน์ · เชื่อมต่อเสถียร ✓', true);
 
-        const remoteFp = JSON.stringify({
-          a: Object.keys(remote.accounts || {}).sort(),
-          r: (remote.requests || []).map(x => `${x.id}:${x.status}:${x.updatedAt || 0}`).sort(),
-          c: (remote.calendar || []).map(x => `${x.empId || ''}:${x.dateKey}:${x.type}`).sort(),
-          t: remote.tombstones || {}
-        });
-
-        let hadDiff = false;
-        if (typeof window.mergeCloudSnapshot === 'function') {
-          hadDiff = window.mergeCloudSnapshot(remote);
-        }
-
-        if (hadDiff && remoteFp !== lastSyncFingerprint) {
-          lastSyncFingerprint = remoteFp;
-          await window.cloudStore.pushFullSnapshot();
-        } else {
-          lastSyncFingerprint = remoteFp;
-        }
+        applyIncomingPayload(remote);
 
         if (showNotification && typeof window.showToast === 'function') {
           window.showToast('☁️ ซิงค์ข้อมูลล่าสุดจากฐานข้อมูลกลางเรียบร้อย');
         }
         return true;
       } catch (e) {
-        setCloudBadge('ออฟไลน์ (กำลังลองเชื่อมต่อใหม่...)', false);
+        consecutiveFailures += 1;
+        if (consecutiveFailures >= 4) {
+          setCloudBadge('ออฟไลน์ (กำลังลองเชื่อมต่อใหม่...)', false);
+        }
         return false;
       } finally {
         isSyncingNow = false;
@@ -815,16 +878,28 @@
   };
 
   async function initCloudDatabase() {
+    connectNtfyRealtimeStream();
     await window.cloudStore.pullFromCloud(false);
 
     setInterval(() => {
-      if (Date.now() - lastCloudPushAt > 1800) {
+      if (Date.now() - lastCloudPushAt > 3000) {
         window.cloudStore.pullFromCloud(false);
       }
-    }, 2200);
+    }, 6500);
+
+    window.addEventListener('online', () => {
+      consecutiveFailures = 0;
+      connectNtfyRealtimeStream();
+      window.cloudStore.pullFromCloud(false);
+    });
+
+    window.addEventListener('offline', () => {
+      setCloudBadge('ออฟไลน์ (ไม่พบสัญญาณเน็ต)', false);
+    });
 
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) {
+        connectNtfyRealtimeStream();
         window.cloudStore.pullFromCloud(false);
       }
     });
@@ -957,14 +1032,13 @@
     activeTab: 'cal',
     approvalSubTab: 'pending',
     viewYear: 2026,
-    viewMonth: 10, // พฤศจิกายน 2569 (0-indexed: 10 = Nov)
+    viewMonth: 10,
     items: {},
     teamRequests: safeJsonParse(localStorage.getItem(LS_KEYS.requests), []),
     iconSeed: 0,
     confirmDeleteEmpId: null
   };
 
-  // Init Thai current month/year if needed
   (function initCurrentThaiDate() {
     const now = new Date();
     if (now.getFullYear() >= 2025) {
@@ -1037,7 +1111,6 @@
       }
     });
 
-    // Purge deleted accounts locally
     deletedAccountIds.forEach(delId => {
       if (registeredAccounts[delId]) {
         delete registeredAccounts[delId];
@@ -1045,7 +1118,6 @@
       }
     });
 
-    // Merge accounts
     Object.entries(remote.accounts || {}).forEach(([rawId, acc]) => {
       if (!acc) return;
       const empId = String(acc.empId || rawId).trim().toUpperCase();
@@ -1062,7 +1134,6 @@
       }
     });
 
-    // Merge requests
     const reqMap = new Map();
     state.teamRequests.forEach(r => {
       const empUp = (r.empId || '').trim().toUpperCase();
@@ -1089,7 +1160,6 @@
     });
     state.teamRequests = Array.from(reqMap.values()).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 
-    // Merge calendar items
     const calMap = new Map();
     allCloudCalendarItems.forEach(c => {
       const empUp = (c.empId || '').trim().toUpperCase();
@@ -1287,7 +1357,6 @@
       return;
     }
 
-    // Pull latest accounts before validating
     if (window.cloudStore && window.cloudStore.pullFromCloud) {
       await window.cloudStore.pullFromCloud(false);
     }
@@ -1341,7 +1410,6 @@
       return;
     }
 
-    // Login mode for employees
     const acc = registeredAccounts[empId];
     if (!acc) {
       showToast('ไม่พบรหัสพนักงานนี้ กดปุ่ม "✨ สร้างรหัสพนักงาน" ด้านบนเพื่อลงทะเบียน');
@@ -1709,7 +1777,6 @@
     editingDateKey = dateKey;
     const existing = state.items[dateKey];
 
-    // ล้างรูปเช็คเอาท์เก่าออกเสมอเมื่อเปิดวันใหม่ที่ไม่มีรูปของตัวเอง
     currentPhoto = (existing && existing.photo) ? existing.photo : '';
     currentCheckoutTime = (existing && existing.checkoutTime) ? existing.checkoutTime : '';
     currentCheckoutLocation = (existing && existing.checkoutLocation) ? existing.checkoutLocation : '';
@@ -2152,7 +2219,6 @@
       `;
     }
 
-    // Employee view
     const myReqs = state.teamRequests.filter(r => (r.empId || '').toUpperCase() === myId);
     const myOtHrs = myReqs.filter(r => r.type === 'ot' && r.status !== 'rejected').reduce((s, r) => s + (Number(r.hours) || 0), 0);
     const myLeaveDays = myReqs.filter(r => r.type === 'leave' && r.status !== 'rejected').reduce((s, r) => {
@@ -2429,7 +2495,16 @@
           <h3 class="text-sm font-bold">☁️ การซิงค์ฐานข้อมูลกลางข้ามเครื่อง</h3>
           <button type="button" onclick="window.cloudStore && window.cloudStore.pullFromCloud(true)" class="comic-pill px-3 py-1 text-[11px] bg-[#c6f3dc]">🔄 ซิงค์ขึ้น-ลงเดี๋ยวนี้</button>
         </div>
-        <p class="text-[11px] text-[#7a76a3]">ระบบซิงค์ข้อมูลบัญชี คำขอ OT และวันลาพักร้อนระหว่างคอมพิวเตอร์และโทรศัพท์มือถืออัตโนมัติทุก 2 วินาที</p>
+        <p class="text-[11px] text-[#7a76a3]">เชื่อมต่อแบบ Realtime Stream + สำรองอัตโนมัติ (ไม่โดนบล็อก Rate Limit และไม่หลุดง่าย)</p>
+        ${manager ? `
+          <div class="mt-2.5 pt-2.5 border-t border-dashed border-[#c7c3ea]">
+            <label class="block text-[11px] font-bold mb-1">🔗 ลิงก์ฐานข้อมูลส่วนตัว (Firebase Realtime DB / JSON URL — ไม่บังคับ)</label>
+            <div class="flex gap-1.5">
+              <input id="inpCustomCloudUrl" type="url" value="${localStorage.getItem('oto_central_blob_url_v8') || ''}" class="comic-input !py-1.5 !text-xs" placeholder="วาง URL เช่น https://xxx.firebaseio.com/oto.json" />
+              <button type="button" onclick="saveCustomCloudUrlSetting()" class="comic-pill px-3 py-1.5 text-[11px] bg-[#ffe6d3] shrink-0">บันทึก</button>
+            </div>
+          </div>
+        ` : ''}
       </div>
 
       ${manager ? `
@@ -2469,10 +2544,18 @@
         </div>
       ` : ''}
 
-      <button type="button" onclick="logoutUser()" class="comic-btn w-full py-3 bg-[#ffd6e0] text-[#1e1b4b] text-sm">
+      <button type="button" onclick="logoutUser()" class="comic-btn w-full py-3 bg-[#ffd6e0] text-sm">
         ออกจากระบบ / สลับรหัสพนักงาน
       </button>
     `;
+  }
+
+  async function saveCustomCloudUrlSetting() {
+    const val = (document.getElementById('inpCustomCloudUrl')?.value || '').trim();
+    if (window.cloudStore && window.cloudStore.setCustomCloudUrl) {
+      await window.cloudStore.setCustomCloudUrl(val);
+      showToast(val ? '☁️ เชื่อมต่อลิงก์ฐานข้อมูลส่วนตัวเรียบร้อย' : '☁️ กลับไปใช้ฐานข้อมูลกลางมาตรฐานแล้ว');
+    }
   }
 
   function handleProfileAvatarUpload(event) {
@@ -2534,7 +2617,6 @@
     deletedAccountIds.add(targetId);
     delete registeredAccounts[targetId];
 
-    // ลบคำขอ OT และวันลาพักร้อนทั้งหมดของบัญชีนี้
     state.teamRequests.forEach(r => {
       if ((r.empId || '').trim().toUpperCase() === targetId) {
         deletedRequestIds.add(r.id);
@@ -2542,7 +2624,6 @@
     });
     state.teamRequests = state.teamRequests.filter(r => (r.empId || '').trim().toUpperCase() !== targetId);
 
-    // ลบรายการบนปฏิทินทั้งหมดของบัญชีนี้
     allCloudCalendarItems.forEach(c => {
       if ((c.empId || '').trim().toUpperCase() === targetId) {
         deletedCalendarKeys.add(`${targetId}_${c.dateKey}`);
@@ -2610,7 +2691,6 @@
     if (clockEl) clockEl.textContent = getThaiTimeStr();
   }, 1000);
 
-  // Resume session if already logged in
   if (state.user && state.user.empId) {
     document.getElementById('loginScreen').classList.add('hidden');
     rebuildVisibleCalendarItems();
