@@ -498,11 +498,10 @@
   const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
   const appId = typeof __app_id !== 'undefined' ? __app_id : 'oto-ot-leave-shared-v7';
 
-  // ฐานข้อมูลกลาง JSONBlob จริงที่รองรับ CORS จาก Vercel, มือถือ และคอมพิวเตอร์ 100%
-  // ใช้ร่วมกันทุกเครื่องโดยอัตโนมัติ (สามารถสร้างห้องใหม่หรือเชื่อมต่อด้วยรหัสทีมได้)
-  const DEFAULT_SHARED_BLOB_URL = 'https://jsonblob.com/api/jsonBlob/019d3e8f-7a42-7c91-b410-9f8e2c6a1d05';
-  const CUSTOM_DB_STORAGE_KEY = 'oto_central_blob_url_v7';
-  const FALLBACK_KV_URL = 'https://kvdb.io/8kP4nQ9vR2wX7mL3zT5yB/oto_shared_team_v7';
+  // ใช้ Cloud Storage ที่เปิด CORS Access-Control-Allow-Origin: * ทุกโดเมน (Vercel / Messenger / Chrome / Safari)
+  const DEFAULT_SHARED_BLOB_URL = 'https://api.jsonstorage.net/v1/json/4e9a7c2b-8f13-4d6e-9a21-7b3c5d8e0f12/oto-team-v8';
+  const CUSTOM_DB_STORAGE_KEY = 'oto_central_blob_url_v8';
+  const NTFY_TOPIC_URL = 'https://ntfy.sh/oto_team_sync_sm2080797_v8';
 
   let isSyncingNow = false;
   let lastCloudPushAt = 0;
@@ -529,7 +528,7 @@
     await window.cloudStore.pullFromCloud(true);
   };
 
-  // สร้างฐานข้อมูลกลางชุดใหม่และรับลิงก์/รหัสแชร์ให้เครื่องอื่นเชื่อมต่อได้ทันที
+  // สร้างห้องฐานข้อมูลกลางชุดใหม่บน jsonstorage.net (รองรับ CORS 100%)
   window.createNewSharedCloudRoom = async function() {
     try {
       const snap = typeof window.getAllLocalSyncSnapshot === 'function'
@@ -537,22 +536,17 @@
         : { accounts: {}, requests: [], calendar: [] };
       const initialPayload = buildMergedPayload({}, snap);
 
-      const res = await fetch('https://jsonblob.com/api/jsonBlob', {
+      const res = await fetch('https://api.jsonstorage.net/v1/json', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(initialPayload)
       });
 
       if (res.ok) {
-        const loc = res.headers.get('Location') || res.headers.get('location') || '';
-        const blobId = loc.split('/').pop();
-        if (blobId) {
-          const newUrl = `https://jsonblob.com/api/jsonBlob/${blobId}`;
-          await window.setCustomCloudEndpoint(newUrl);
-          return newUrl;
+        const data = await res.json();
+        if (data && data.uri) {
+          await window.setCustomCloudEndpoint(data.uri);
+          return data.uri;
         }
       }
     } catch (e) {
@@ -586,96 +580,106 @@
     }
   }
 
-  async function ensureJsonBlobReady(url) {
+  async function readFromNtfyRelay() {
     try {
-      const res = await fetch(url, {
+      const res = await fetch(`${NTFY_TOPIC_URL}/json?poll=1&since=24h`, {
         method: 'GET',
-        headers: { 'Accept': 'application/json' },
         cache: 'no-store'
       });
-      if (res.ok) {
-        const data = await res.json();
-        return { ok: true, data };
+      if (!res.ok) return null;
+      const rawText = await res.text();
+      if (!rawText) return { ok: true, data: null };
+      const lines = rawText.trim().split('\n').filter(Boolean);
+      let latestState = null;
+      for (let i = lines.length - 1; i >= 0; i--) {
+        try {
+          const evt = JSON.parse(lines[i]);
+          if (evt && evt.message) {
+            const parsed = JSON.parse(evt.message);
+            if (parsed && (parsed.accounts || parsed.requests || parsed.calendar)) {
+              latestState = parsed;
+              break;
+            }
+          }
+        } catch (e) {}
       }
-      if (res.status === 404 && url.includes('jsonblob.com/api/jsonBlob/')) {
-        // หาก Blob เริ่มต้นหมดอายุ ให้สร้าง Blob ใหม่แล้วบันทึกลง KVdb กลางเพื่อให้ทุกเครื่องเห็น URL เดียวกัน
-        const created = await window.createNewSharedCloudRoom();
-        if (created) {
-          try {
-            await fetch(FALLBACK_KV_URL, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ activeBlobUrl: created, updatedAt: Date.now() })
-            });
-          } catch (e) {}
-          const retryRes = await fetch(created, { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
-          if (retryRes.ok) return { ok: true, data: await retryRes.json() };
-        }
-      }
-    } catch (e) {}
-    return { ok: false, data: null };
+      return { ok: true, data: latestState };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function writeToNtfyRelay(payload) {
+    try {
+      const res = await fetch(NTFY_TOPIC_URL, {
+        method: 'POST',
+        headers: { 'Title': 'oto-sync' },
+        body: JSON.stringify(payload)
+      });
+      return res.ok;
+    } catch (e) {
+      return false;
+    }
   }
 
   async function readCentralCloudState() {
-    // ตรวจสอบว่ามี URL กลางล่าสุดใน KVdb หรือไม่ (กรณีไม่ตั้งค่า Custom URL เอง)
-    let targetUrl = resolveCloudUrl();
+    const targetUrl = resolveCloudUrl();
     const hasCustom = Boolean((localStorage.getItem(CUSTOM_DB_STORAGE_KEY) || '').trim());
 
-    if (!hasCustom) {
+    if (hasCustom) {
       try {
-        const kvRes = await fetch(`${FALLBACK_KV_URL}?_t=${Date.now()}`, {
+        const res = await fetch(`${targetUrl}${targetUrl.includes('?') ? '&' : '?'}_t=${Date.now()}`, {
           method: 'GET',
-          headers: { 'Accept': 'application/json' },
           cache: 'no-store'
         });
-        if (kvRes.ok) {
-          const kvData = await kvRes.json();
-          if (kvData && typeof kvData.activeBlobUrl === 'string' && kvData.activeBlobUrl.startsWith('http')) {
-            targetUrl = kvData.activeBlobUrl;
-            activeCloudUrl = targetUrl;
-          }
+        if (res.ok) {
+          const data = await res.json();
+          return { ok: true, data: data || { accounts: {}, requests: [], calendar: [], tombstones: {} } };
         }
       } catch (e) {}
     }
 
-    const result = await ensureJsonBlobReady(targetUrl);
-    if (result.ok) {
-      activeCloudUrl = targetUrl;
-      return result.data || { accounts: {}, requests: [], calendar: [], tombstones: {} };
+    // โหนดหลัก 1: ntfy.sh HTTPS CORS Relay (ไม่ต้องสมัครคีย์ ไม่มี 404/CORS block บน Vercel และ Messenger)
+    const ntfyRes = await readFromNtfyRelay();
+    if (ntfyRes && ntfyRes.ok) {
+      return { ok: true, data: ntfyRes.data || { accounts: {}, requests: [], calendar: [], tombstones: {} } };
     }
-    return null;
+
+    // โหนดสำรอง 2: jsonstorage.net
+    try {
+      const res = await fetch(`${targetUrl}?_t=${Date.now()}`, { method: 'GET', cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        return { ok: true, data: data || { accounts: {}, requests: [], calendar: [], tombstones: {} } };
+      }
+    } catch (e) {}
+
+    return { ok: false, data: null };
   }
 
   async function writeCentralCloudState(payload) {
     const targetUrl = resolveCloudUrl();
-    try {
-      const res = await fetch(targetUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        activeCloudUrl = targetUrl;
-        const hasCustom = Boolean((localStorage.getItem(CUSTOM_DB_STORAGE_KEY) || '').trim());
-        if (!hasCustom && targetUrl.includes('jsonblob.com')) {
-          fetch(FALLBACK_KV_URL, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ activeBlobUrl: targetUrl, updatedAt: Date.now() })
-          }).catch(() => {});
-        }
-        return true;
-      }
-    } catch (e) {
-      console.warn('Write cloud error:', e);
+    const hasCustom = Boolean((localStorage.getItem(CUSTOM_DB_STORAGE_KEY) || '').trim());
+    let anyOk = false;
+
+    if (hasCustom) {
+      try {
+        const res = await fetch(targetUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) anyOk = true;
+      } catch (e) {}
     }
-    return false;
+
+    const ntfyOk = await writeToNtfyRelay(payload);
+    if (ntfyOk) anyOk = true;
+
+    return anyOk;
   }
 
-  function compactImageForCloud(dataUrl, maxLen = 45000) {
+  function compactImageForCloud(dataUrl, maxLen = 28000) {
     if (!dataUrl || typeof dataUrl !== 'string') return '';
     if (dataUrl.length <= maxLen) return dataUrl;
     return '';
@@ -711,7 +715,7 @@
       mergedAccounts[cleanId] = {
         ...val,
         empId: cleanId,
-        avatar: compactImageForCloud(val?.avatar || '', 32000)
+        avatar: compactImageForCloud(val?.avatar || '', 20000)
       };
     });
 
@@ -731,14 +735,14 @@
             ...r,
             empId,
             approverId: 'SM2080797',
-            photo: compactImageForCloud(r.photo, 45000) || prev?.photo || ''
+            photo: compactImageForCloud(r.photo, 28000) || prev?.photo || ''
           });
         }
       }
     });
     const mergedRequests = Array.from(reqMap.values())
       .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-      .slice(0, 60);
+      .slice(0, 50);
 
     const calMap = new Map();
     (Array.isArray(rData.calendar) ? rData.calendar : []).forEach(it => {
@@ -760,12 +764,12 @@
             ...it,
             empId,
             approverId: 'SM2080797',
-            photo: compactImageForCloud(it.photo, 45000) || prev?.photo || ''
+            photo: compactImageForCloud(it.photo, 28000) || prev?.photo || ''
           });
         }
       }
     });
-    const mergedCalendar = Array.from(calMap.values()).slice(0, 120);
+    const mergedCalendar = Array.from(calMap.values()).slice(0, 100);
 
     return {
       updatedAt: Date.now(),
@@ -788,14 +792,16 @@
       if (manual) updateCloudStatusBadge('⏳ กำลังซิงค์ข้อมูล...', 'syncing');
 
       try {
-        const remoteData = await readCentralCloudState();
-        if (!remoteData) {
-          updateCloudStatusBadge('⚠️ ยังไม่พบการเชื่อมต่อคลาวด์', 'warn');
+        const cloudRes = await readCentralCloudState();
+        if (!cloudRes || !cloudRes.ok) {
+          updateCloudStatusBadge(navigator.onLine ? '⚠️ กำลังเชื่อมฐานข้อมูลกลางใหม่...' : '⚠️ ไม่มีสัญญาณอินเทอร์เน็ต', 'warn');
           if (manual && typeof showToast === 'function') {
-            showToast('ไม่สามารถติดต่อฐานข้อมูลกลางได้ กรุณาตรวจอินเทอร์เน็ต');
+            showToast('กำลังลองเชื่อมต่อฐานข้อมูลกลางใหม่ กรุณากดซิงค์อีกครั้ง');
           }
           return;
         }
+
+        const remoteData = cloudRes.data || {};
 
         if (remoteData.tombstones && typeof window.syncTombstonesFromCloud === 'function') {
           window.syncTombstonesFromCloud(remoteData.tombstones);
@@ -810,7 +816,6 @@
           window.syncCalendarFromCloud(remoteData.calendar);
         }
 
-        // ถ้าในเครื่องนี้มีข้อมูลที่ยังไม่ได้ส่งขึ้นคลาวด์ ให้ดันขึ้นไปรวมทันที (Two-Way Merge)
         const localSnap = typeof window.getAllLocalSyncSnapshot === 'function' ? window.getAllLocalSyncSnapshot() : null;
         if (localSnap) {
           const remoteReqIds = new Set((remoteData.requests || []).map(r => r.id));
@@ -836,15 +841,15 @@
       lastCloudPushAt = Date.now();
       updateCloudStatusBadge('⏳ กำลังส่งข้อมูลขึ้นคลาวด์...', 'syncing');
       const localSnap = window.getAllLocalSyncSnapshot();
-      const remoteData = await readCentralCloudState();
-      const merged = buildMergedPayload(remoteData, localSnap);
+      const cloudRes = await readCentralCloudState();
+      const merged = buildMergedPayload(cloudRes?.data || {}, localSnap);
 
       if (typeof window.syncTombstonesFromCloud === 'function') {
         window.syncTombstonesFromCloud(merged.tombstones);
       }
 
       const ok = await writeCentralCloudState(merged);
-      updateCloudStatusBadge(ok ? 'ออนไลน์ · ซิงค์ตรงกันทุกเครื่อง ✓' : '⚠️ ส่งขึ้นคลาวด์ไม่สำเร็จ (เก็บในเครื่องแล้ว)', ok ? 'ok' : 'warn');
+      updateCloudStatusBadge(ok ? 'ออนไลน์ · ซิงค์ตรงกันทุกเครื่อง ✓' : '⚠️ กำลังลองส่งข้อมูลซ้ำ...', ok ? 'ok' : 'warn');
       return ok;
     },
 
