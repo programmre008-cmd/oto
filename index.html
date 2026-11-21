@@ -499,7 +499,14 @@ import { initializeFirestore, getFirestore, persistentLocalCache, persistentMult
 // ★ ตั้งค่าฐานข้อมูลกลาง (Firebase / Firestore) — วาง firebaseConfig ของโปรเจกต์ตัวเองตรงนี้ ★
 // ตัวอย่าง: { apiKey: "AIza...", authDomain: "xxx.firebaseapp.com", projectId: "xxx", appId: "1:123:web:abc" }
 // =====================================================================
-const EMBEDDED_FIREBASE_CONFIG = null;
+const EMBEDDED_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyChhnbQeF1z4_xPnjof7ggFiH0RrnpdXNQ",
+  authDomain: "ogtar-71b7e.firebaseapp.com",
+  projectId: "ogtar-71b7e",
+  storageBucket: "ogtar-71b7e.firebasestorage.app",
+  messagingSenderId: "984596630182",
+  appId: "1:984596630182:web:6e912209acb063a7dd8267"
+};
 
 const LS_CFG = 'oto_firebase_config_v10';
 const SEEN_KEY = 'oto_seen_v10';
