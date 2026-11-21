@@ -489,501 +489,387 @@
   <div class="toast-pill" id="toastPill"></div>
 </div>
 
-<!-- Fast Event + Snapshot Cross-Device Cloud Sync -->
+<!-- Firestore real-time cross-device sync (เลิกใช้ ntfy.sh) -->
 <script type="module">
-  import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
-  import { getAuth, signInAnonymously, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-  import { getFirestore, doc, setDoc, deleteDoc, collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+import { getAuth, signInAnonymously, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDoc, getDocs, setDoc, deleteDoc, collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
-  const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-  const appId = typeof __app_id !== 'undefined' ? __app_id : 'oto-ot-leave-shared-v9';
+// =====================================================================
+// ★ ตั้งค่าฐานข้อมูลกลาง (Firebase / Firestore) — วาง firebaseConfig ของโปรเจกต์ตัวเองตรงนี้ ★
+// ตัวอย่าง: { apiKey: "AIza...", authDomain: "xxx.firebaseapp.com", projectId: "xxx", appId: "1:123:web:abc" }
+// =====================================================================
+const EMBEDDED_FIREBASE_CONFIG = null;
 
-  const CUSTOM_DB_STORAGE_KEY = 'oto_central_blob_url_v9';
-  const NTFY_BASE_URL = 'https://ntfy.sh';
-  const NTFY_SNAPSHOT_TOPIC = 'oto_team_snap_sm2080797_v9';
-  const NTFY_EVENTS_TOPIC = 'oto_team_live_sm2080797_v9';
+const LS_CFG = 'oto_firebase_config_v10';
+const SEEN_KEY = 'oto_seen_v10';
+const $id = (x) => document.getElementById(x);
+const toast = (m) => { try { window.showToast && window.showToast(m); } catch (e) {} };
+const safeId = (s) => String(s || '').replace(/[\/\s]/g, '_');
 
-  let isSyncingNow = false;
-  let lastCloudPushAt = 0;
-  let activeCloudUrl = '';
-  let consecutiveFailures = 0;
-  let snapEventSource = null;
-  let liveEventSource = null;
-  let pendingPushTimer = null;
-  let seenEventIds = new Set();
+function parseCfgText(text) {
+  const t = String(text || '');
+  const a = t.indexOf('{'), b = t.lastIndexOf('}');
+  if (a < 0 || b < a) return null;
+  let body = t.slice(a, b + 1);
+  try { return JSON.parse(body); } catch (e) {}
+  try {
+    body = body.replace(/([{,]\s*)([A-Za-z0-9_]+)\s*:/g, '$1"$2":').replace(/,\s*}/g, '}').replace(/'/g, '"');
+    return JSON.parse(body);
+  } catch (e) { return null; }
+}
 
-  function resolveCloudUrl() {
-    const custom = (localStorage.getItem(CUSTOM_DB_STORAGE_KEY) || '').trim();
-    if (custom && custom.startsWith('http')) {
-      activeCloudUrl = custom;
-      return custom;
-    }
-    activeCloudUrl = `${NTFY_BASE_URL}/${NTFY_SNAPSHOT_TOPIC}`;
-    return activeCloudUrl;
+function resolveConfig() {
+  if (EMBEDDED_FIREBASE_CONFIG && EMBEDDED_FIREBASE_CONFIG.projectId) return EMBEDDED_FIREBASE_CONFIG;
+  if (typeof __firebase_config !== 'undefined') { try { return JSON.parse(__firebase_config); } catch (e) {} }
+  try { const v = localStorage.getItem(LS_CFG); if (v) return JSON.parse(v); } catch (e) {}
+  return null;
+}
+
+const BASE = (typeof __app_id !== 'undefined') ? ['artifacts', __app_id, 'public', 'data'] : [];
+let db = null, cloudOn = false, pendingWrites = 0, lastError = '', smHash = '';
+const first = { accounts: false, requests: false, calendar: false, settings: false };
+const lastIds = { accounts: new Set(), requests: new Set(), calendar: new Set() };
+let seen = { accounts: [], requests: [], calendar: [] };
+try { seen = { ...seen, ...JSON.parse(localStorage.getItem(SEEN_KEY) || '{}') }; } catch (e) {}
+const persistSeen = () => { try { localStorage.setItem(SEEN_KEY, JSON.stringify(seen)); } catch (e) {} };
+const photoSig = new Map();
+const photoFail = new Map();
+
+// ---------- สถานะการเชื่อมต่อ (แสดงตามจริง ไม่หลอกว่าออนไลน์) ----------
+const BADGE = {
+  local:      ['⚠️ ยังไม่ได้ตั้งค่าฐานข้อมูลกลาง · ข้อมูลอยู่เฉพาะเครื่องนี้', '⚠️ ไม่มีฐานข้อมูลกลาง', 'warn'],
+  error:      ['⚠️ เชื่อมฐานข้อมูลไม่สำเร็จ (' + '${E}' + ') · ตรวจ Rules / Anonymous Auth', '⚠️ เชื่อมต่อผิดพลาด', 'warn'],
+  offline:    ['⚠️ ออฟไลน์ · จะส่งขึ้นระบบกลางอัตโนมัติเมื่อมีเน็ต', '⚠️ ออฟไลน์', 'warn'],
+  pending:    ['กำลังส่งข้อมูลขึ้นระบบกลาง…', '☁️ กำลังส่ง…', 'wait'],
+  connecting: ['กำลังเชื่อมต่อฐานข้อมูล…', '☁️ เชื่อมต่อ…', 'wait'],
+  online:     ['ออนไลน์ · ซิงค์ข้ามเครื่องแล้ว ✓', '☁️ ออนไลน์ ✓', 'ok']
+};
+function badgeKind() {
+  if (!cloudOn) return 'local';
+  if (lastError) return 'error';
+  if (!navigator.onLine) return 'offline';
+  if (pendingWrites > 0) return 'pending';
+  if (!(first.accounts && first.requests && first.calendar)) return 'connecting';
+  return 'online';
+}
+function applyBadge() {
+  const k = badgeKind(), b = BADGE[k];
+  const el = $id('cloudSyncStatusText');
+  if (el) {
+    el.textContent = b[0].replace('${E}', lastError);
+    el.className = b[2] === 'ok' ? 'text-[#36c78c] font-bold text-right' : 'text-[#ffb98a] font-bold text-right';
   }
-
-  function compactImageForCloud(dataUrl, maxLen = 22000) {
-    if (!dataUrl || typeof dataUrl !== 'string') return '';
-    if (dataUrl.length <= maxLen) return dataUrl;
-    return '';
+  const hb = $id('headerCloudBadge');
+  if (hb) {
+    hb.textContent = b[1];
+    hb.className = 'text-[10px] px-2.5 py-0.5 rounded-full border border-[#1e1b4b] font-bold text-[#1e1b4b] ' +
+      (b[2] === 'ok' ? 'bg-[#c6f3dc]' : b[2] === 'wait' ? 'bg-[#fff1b8]' : 'bg-[#ffd6e0]');
   }
+}
+setInterval(applyBadge, 1200);
+window.addEventListener('online', applyBadge);
+window.addEventListener('offline', applyBadge);
 
-  function buildCompactSnapshot() {
-    const stateObj = window.getAppSyncSnapshot ? window.getAppSyncSnapshot() : {
-      accounts: {},
-      requests: [],
-      calendar: [],
-      tombstones: { accounts: [], requests: [], calendar: [] }
-    };
-
-    const compactAccounts = {};
-    Object.entries(stateObj.accounts || {}).forEach(([k, acc]) => {
-      if (!acc) return;
-      compactAccounts[k] = {
-        ...acc,
-        avatarPhoto: compactImageForCloud(acc.avatarPhoto, 20000)
-      };
-    });
-
-    const compactRequests = (stateObj.requests || []).slice(0, 80).map(r => ({
-      ...r,
-      photo: compactImageForCloud(r.photo, 24000)
-    }));
-
-    const compactCalendar = (stateObj.calendar || []).slice(0, 120).map(c => ({
-      ...c,
-      photo: compactImageForCloud(c.photo, 18000)
-    }));
-
-    return {
-      kind: 'snapshot',
-      updatedAt: Date.now(),
-      accounts: compactAccounts,
-      requests: compactRequests,
-      calendar: compactCalendar,
-      tombstones: stateObj.tombstones || { accounts: [], requests: [], calendar: [] }
-    };
-  }
-
-  function handleIncomingMessageObj(parsed) {
-    if (!parsed || typeof parsed !== 'object') return false;
-    if (parsed.eventId) {
-      if (seenEventIds.has(parsed.eventId)) return false;
-      seenEventIds.add(parsed.eventId);
-      if (seenEventIds.size > 400) {
-        const arr = Array.from(seenEventIds).slice(-200);
-        seenEventIds = new Set(arr);
-      }
-    }
-
-    if (parsed.kind === 'event' && typeof window.applyLiveEvent === 'function') {
-      return window.applyLiveEvent(parsed);
-    }
-
-    if (parsed.accounts || parsed.requests || parsed.calendar || parsed.tombstones) {
-      if (typeof window.mergeCloudSnapshot === 'function') {
-        return window.mergeCloudSnapshot(parsed);
-      }
-    }
-    return false;
-  }
-
-  function connectRealtimeStreams() {
-    if (snapEventSource) {
-      try { snapEventSource.close(); } catch (e) {}
-      snapEventSource = null;
-    }
-    if (liveEventSource) {
-      try { liveEventSource.close(); } catch (e) {}
-      liveEventSource = null;
-    }
-
-    try {
-      const esLive = new EventSource(`${NTFY_BASE_URL}/${NTFY_EVENTS_TOPIC}/sse?since=6h`);
-      liveEventSource = esLive;
-      esLive.onopen = () => {
-        consecutiveFailures = 0;
-        setCloudBadge('ออนไลน์ · ซิงค์ไว ✓', true);
-      };
-      esLive.onmessage = (event) => {
-        consecutiveFailures = 0;
-        setCloudBadge('ออนไลน์ · ซิงค์ไว ✓', true);
-        try {
-          const evt = JSON.parse(event.data);
-          if (evt && evt.message) {
-            const parsed = JSON.parse(evt.message);
-            handleIncomingMessageObj(parsed);
-          }
-        } catch (e) {}
-      };
-      esLive.onerror = () => {};
-    } catch (e) {}
-
-    try {
-      const esSnap = new EventSource(`${NTFY_BASE_URL}/${NTFY_SNAPSHOT_TOPIC}/sse?since=24h`);
-      snapEventSource = esSnap;
-      esSnap.onmessage = (event) => {
-        consecutiveFailures = 0;
-        try {
-          const evt = JSON.parse(event.data);
-          if (evt && evt.message) {
-            const parsed = JSON.parse(evt.message);
-            handleIncomingMessageObj(parsed);
-          }
-        } catch (e) {}
-      };
-      esSnap.onerror = () => {};
-    } catch (e) {}
-  }
-
-  async function pollTopicLines(topicUrl) {
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 5000);
-      const res = await fetch(`${topicUrl}/json?poll=1&since=24h`, {
-        method: 'GET',
-        cache: 'no-store',
-        signal: controller.signal
-      });
-      clearTimeout(timer);
-      if (!res.ok) return null;
-      const text = await res.text();
-      if (!text.trim()) return [];
-      const lines = text.trim().split('\n');
-      const items = [];
-      for (let i = 0; i < lines.length; i++) {
-        try {
-          const evt = JSON.parse(lines[i]);
-          if (evt && evt.message) {
-            const parsed = JSON.parse(evt.message);
-            if (parsed && typeof parsed === 'object') items.push(parsed);
-          }
-        } catch (e) {}
-      }
-      return items;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  async function postToTopic(topicUrl, payloadObj) {
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 6000);
-      const res = await fetch(topicUrl, {
-        method: 'POST',
-        headers: { 'Title': 'oto_live' },
-        body: JSON.stringify(payloadObj),
-        signal: controller.signal
-      });
-      clearTimeout(timer);
-      return res.ok;
-    } catch (e) {
+// ---------- เขียนข้อมูล: ไม่บล็อก UI (คิวในเครื่อง + ส่งซ้ำอัตโนมัติเมื่อมีเน็ต) ----------
+function write(fn, ms = 4000) {
+  let p;
+  try { p = fn(); } catch (e) { return Promise.resolve(false); }
+  pendingWrites++; applyBadge();
+  const done = p.then(() => { lastError = ''; return true; })
+    .catch((e) => {
+      lastError = (e && e.code) || 'error';
+      if (e && e.code === 'permission-denied') toast('ฐานข้อมูลปฏิเสธการบันทึก (ตรวจ Firestore Rules / เปิด Anonymous Auth)');
       return false;
-    }
-  }
+    })
+    .finally(() => { pendingWrites = Math.max(0, pendingWrites - 1); applyBadge(); });
+  return Promise.race([done, new Promise((r) => setTimeout(() => r(false), ms))]);
+}
+const put = (name, id, data) => db ? write(() => setDoc(doc(db, ...BASE, name, safeId(id)), data)) : Promise.resolve(false);
+const del = (name, id) => db ? write(() => deleteDoc(doc(db, ...BASE, name, safeId(id)))) : Promise.resolve(false);
 
-  function setCloudBadge(text, isOnline) {
-    const el = document.getElementById('cloudSyncStatusText');
-    if (el) {
-      el.textContent = text;
-      el.className = isOnline ? 'text-[#36c78c] font-bold text-right' : 'text-[#ffb98a] font-bold text-right';
-    }
-    const headerBadge = document.getElementById('headerCloudBadge');
-    if (headerBadge) {
-      headerBadge.textContent = isOnline ? '☁️ ออนไลน์ ✓' : '⚠️ ออฟไลน์';
-      headerBadge.className = isOnline
-        ? 'text-[10px] px-2.5 py-0.5 rounded-full bg-[#c6f3dc] border border-[#1e1b4b] font-bold text-[#1e1b4b]'
-        : 'text-[10px] px-2.5 py-0.5 rounded-full bg-[#ffd6e0] border border-[#1e1b4b] font-bold text-[#1e1b4b]';
-    }
-  }
-
-  function scheduleDebouncedSnapshotPush() {
-    clearTimeout(pendingPushTimer);
-    pendingPushTimer = setTimeout(() => {
-      if (window.cloudStore) window.cloudStore.pushFullSnapshot();
-    }, 350);
-  }
-
-  let db = null;
-  let firestoreReady = false;
-
-  function safeFirestorePayload(obj) {
-    const copy = { ...obj };
-    if (copy.photo && copy.photo.length > 650000) copy.photo = '';
-    if (copy.avatarPhoto && copy.avatarPhoto.length > 350000) copy.avatarPhoto = '';
-    return copy;
-  }
-
-  window.cloudStore = {
-    isReady: () => firestoreReady || Boolean(activeCloudUrl),
-    getCloudUrl: () => resolveCloudUrl(),
-    setCustomCloudUrl: async (newUrl) => {
-      const clean = (newUrl || '').trim();
-      if (clean && clean.startsWith('http')) {
-        localStorage.setItem(CUSTOM_DB_STORAGE_KEY, clean);
-      } else {
-        localStorage.removeItem(CUSTOM_DB_STORAGE_KEY);
+// ---------- บีบอัดรูป (รูปแยกเก็บคนละคอลเลกชัน ให้รายการเบาและเร็ว) ----------
+function shrink(dataUrl, maxLen = 110000, maxW = 640) {
+  if (!dataUrl || dataUrl.length <= maxLen) return Promise.resolve(dataUrl);
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let w = Math.min(img.width, maxW), q = 0.72, out = dataUrl;
+      for (let i = 0; i < 7; i++) {
+        const c = document.createElement('canvas');
+        c.width = w; c.height = Math.max(1, Math.round(img.height * w / img.width));
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        out = c.toDataURL('image/jpeg', q);
+        if (out.length <= maxLen) break;
+        q = Math.max(0.4, q - 0.08); w = Math.round(w * 0.85);
       }
-      resolveCloudUrl();
-      await window.cloudStore.pushFullSnapshot();
-      await window.cloudStore.pullFromCloud(true);
-    },
+      resolve(out);
+    };
+    img.onerror = () => resolve('');
+    img.src = dataUrl;
+  });
+}
+async function savePhoto(kind, id, dataUrl) {
+  if (!db || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) return false;
+  const key = kind + '_' + id;
+  const sig = dataUrl.length + ':' + dataUrl.slice(-48);
+  if (photoSig.get(key) === sig) return true;
+  const small = await shrink(dataUrl);
+  if (!small) return false;
+  photoSig.set(key, sig);
+  return put('oto_photos', key, { data: small, updatedAt: Date.now() });
+}
 
-    buildLocalSnapshot: buildCompactSnapshot,
-
-    emitLiveEvent: async (action, data) => {
-      const evtId = `${action}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-      seenEventIds.add(evtId);
-      const compactData = { ...data };
-      if (compactData.photo) compactData.photo = compactImageForCloud(compactData.photo, 24000);
-      if (compactData.avatarPhoto) compactData.avatarPhoto = compactImageForCloud(compactData.avatarPhoto, 20000);
-
-      const payload = {
-        kind: 'event',
-        eventId: evtId,
-        action,
-        updatedAt: Date.now(),
-        data: compactData
-      };
-      lastCloudPushAt = Date.now();
-      const ok = await postToTopic(`${NTFY_BASE_URL}/${NTFY_EVENTS_TOPIC}`, payload);
-      if (ok) {
-        consecutiveFailures = 0;
-        setCloudBadge('ออนไลน์ · ซิงค์ไว ✓', true);
+// ---------- ฟังข้อมูลจากฐานข้อมูลแบบเรียลไทม์ ----------
+function applyDelete(kind, id) {
+  try {
+    if (kind === 'accounts') {
+      window.applyLiveEvent({ action: 'delete_account', data: { empId: id } });
+      const u = window.getCurrentUserInfo && window.getCurrentUserInfo();
+      if (u && !u.manager && u.empId.toUpperCase() === String(id).toUpperCase()) {
+        toast('บัญชีนี้ถูกลบออกจากระบบแล้ว'); window.logoutUser && window.logoutUser();
       }
-      scheduleDebouncedSnapshotPush();
-      return ok;
-    },
+    } else if (kind === 'requests') {
+      window.applyLiveEvent({ action: 'delete_request', data: { id } });
+    } else {
+      const i = id.lastIndexOf('_');
+      window.applyLiveEvent({ action: 'delete_calendar', data: { empId: id.slice(0, i), dateKey: id.slice(i + 1) } });
+    }
+  } catch (e) {}
+}
 
-    pushFullSnapshot: async () => {
+let uploading = false;
+async function uploadLocalOnly(kind) {
+  if (uploading || !db || !window.getAppSyncSnapshot) return;
+  const u = window.getCurrentUserInfo && window.getCurrentUserInfo();
+  if (!u || !u.empId) return;
+  const me = u.empId.toUpperCase();
+  const mine = (e) => u.manager || String(e || '').toUpperCase() === me;
+  const snap = window.getAppSyncSnapshot(), tomb = snap.tombstones || {}, cloud = lastIds[kind];
+  const jobs = [];
+  if (kind === 'accounts') {
+    Object.entries(snap.accounts || {}).forEach(([k, a]) => {
+      if (!a) return;
+      const id = String(a.empId || k).toUpperCase();
+      if (cloud.has(safeId(id)) || (tomb.accounts || []).includes(id) || !mine(id)) return;
+      jobs.push(() => window.cloudStore.saveAccount(a));
+    });
+  } else if (kind === 'requests') {
+    (snap.requests || []).forEach((r) => {
+      if (!r || !r.id || cloud.has(safeId(r.id)) || (tomb.requests || []).includes(r.id) || !mine(r.empId)) return;
+      jobs.push(() => window.cloudStore.saveRequest(r));
+    });
+  } else {
+    (snap.calendar || []).forEach((c) => {
+      if (!c || !c.dateKey) return;
+      const emp = String(c.empId || '').toUpperCase(), key = emp + '_' + c.dateKey;
+      if (cloud.has(safeId(key)) || (tomb.calendar || []).includes(key) || !mine(emp)) return;
+      jobs.push(() => window.cloudStore.saveCalendarItem(c));
+    });
+  }
+  if (!jobs.length) return;
+  uploading = true;
+  try { for (const j of jobs.slice(0, 60)) await j(); } finally { uploading = false; }
+  try { window.persistLocalDatabase && window.persistLocalDatabase(); } catch (e) {}
+}
+
+let photoTimer = null;
+function schedulePhotos() { clearTimeout(photoTimer); photoTimer = setTimeout(loadPhotos, 400); }
+async function loadPhotos() {
+  if (!db || !window.getAppSyncSnapshot) return;
+  const u = window.getCurrentUserInfo && window.getCurrentUserInfo();
+  if (!u || !u.empId) return;
+  const me = u.empId.toUpperCase(), snap = window.getAppSyncSnapshot();
+  const ok = (e) => u.manager || String(e || '').toUpperCase() === me;
+  const need = [];
+  (snap.requests || []).slice(0, 60).forEach((r) => { if (r && r.hasPhoto && !r.photo && ok(r.empId)) need.push(['req', r.id, r]); });
+  (snap.calendar || []).slice(0, 120).forEach((c) => {
+    if (c && c.hasPhoto && !c.photo && ok(c.empId)) need.push(['cal', String(c.empId || '').toUpperCase() + '_' + c.dateKey, c]);
+  });
+  let changed = false, idx = 0;
+  const worker = async () => {
+    while (idx < need.length) {
+      const [kind, id, obj] = need[idx++];
+      const key = safeId(kind + '_' + id);
+      if ((photoFail.get(key) || 0) > Date.now()) continue;
       try {
-        lastCloudPushAt = Date.now();
-        const payload = buildCompactSnapshot();
-        const customUrl = (localStorage.getItem(CUSTOM_DB_STORAGE_KEY) || '').trim();
-        const tasks = [postToTopic(`${NTFY_BASE_URL}/${NTFY_SNAPSHOT_TOPIC}`, payload)];
-
-        if (customUrl && customUrl.startsWith('http')) {
-          tasks.push(
-            fetch(customUrl, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload)
-            }).then(r => r.ok).catch(() => false)
-          );
-        }
-
-        const results = await Promise.all(tasks);
-        const ok = results.some(Boolean);
-        if (ok) {
-          consecutiveFailures = 0;
-          setCloudBadge('ออนไลน์ · ซิงค์ไว ✓', true);
-        } else {
-          consecutiveFailures += 1;
-          if (consecutiveFailures >= 4 || !navigator.onLine) {
-            setCloudBadge('ออฟไลน์ (ข้อมูลเก็บในเครื่อง)', false);
-          }
-        }
-        return ok;
-      } catch (e) {
-        consecutiveFailures += 1;
-        if (consecutiveFailures >= 4 || !navigator.onLine) {
-          setCloudBadge('ออฟไลน์ (ข้อมูลเก็บในเครื่อง)', false);
-        }
-        return false;
-      }
-    },
-
-    pullFromCloud: async (showNotification = false) => {
-      if (isSyncingNow) return false;
-      if (!navigator.onLine) {
-        setCloudBadge('ออฟไลน์ (ไม่พบสัญญาณเน็ต)', false);
-        return false;
-      }
-      isSyncingNow = true;
-      try {
-        const customUrl = (localStorage.getItem(CUSTOM_DB_STORAGE_KEY) || '').trim();
-        const [liveItems, snapItems] = await Promise.all([
-          pollTopicLines(`${NTFY_BASE_URL}/${NTFY_EVENTS_TOPIC}`),
-          pollTopicLines(`${NTFY_BASE_URL}/${NTFY_SNAPSHOT_TOPIC}`)
-        ]);
-
-        let customSnap = null;
-        if (customUrl && customUrl.startsWith('http')) {
-          try {
-            const cRes = await fetch(customUrl, { method: 'GET', cache: 'no-store' });
-            if (cRes.ok) customSnap = await cRes.json();
-          } catch (e) {}
-        }
-
-        if (liveItems === null && snapItems === null && !customSnap) {
-          consecutiveFailures += 1;
-          if (consecutiveFailures >= 4) {
-            setCloudBadge('ออฟไลน์ (กำลังลองเชื่อมต่อใหม่...)', false);
-          }
-          return false;
-        }
-
-        consecutiveFailures = 0;
-        setCloudBadge('ออนไลน์ · ซิงค์ไว ✓', true);
-
-        if (customSnap && typeof customSnap === 'object') {
-          handleIncomingMessageObj(customSnap);
-        }
-
-        if (Array.isArray(snapItems) && snapItems.length > 0) {
-          const latestSnap = snapItems[snapItems.length - 1];
-          handleIncomingMessageObj(latestSnap);
-        }
-
-        if (Array.isArray(liveItems) && liveItems.length > 0) {
-          for (const item of liveItems) {
-            handleIncomingMessageObj(item);
-          }
-        }
-
-        if (showNotification && typeof window.showToast === 'function') {
-          window.showToast('☁️ ซิงค์ข้อมูลล่าสุดเรียบร้อยแล้ว');
-        }
-        return true;
-      } catch (e) {
-        consecutiveFailures += 1;
-        if (consecutiveFailures >= 4) {
-          setCloudBadge('ออฟไลน์ (กำลังลองเชื่อมต่อใหม่...)', false);
-        }
-        return false;
-      } finally {
-        isSyncingNow = false;
-      }
-    },
-
-    saveAccount: async (acc) => {
-      if (!acc || !acc.empId) return;
-      if (firestoreReady && db) {
-        try {
-          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'oto_accounts', acc.empId.toUpperCase()), safeFirestorePayload(acc));
-        } catch (e) {}
-      }
-      await window.cloudStore.emitLiveEvent('upsert_account', acc);
-    },
-
-    deleteAccount: async (empId) => {
-      if (!empId) return;
-      if (firestoreReady && db) {
-        try {
-          await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'oto_accounts', empId.toUpperCase()));
-        } catch (e) {}
-      }
-      await window.cloudStore.emitLiveEvent('delete_account', { empId: empId.toUpperCase() });
-    },
-
-    saveRequest: async (req) => {
-      if (!req || !req.id) return;
-      if (firestoreReady && db) {
-        try {
-          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'oto_requests', req.id), safeFirestorePayload(req));
-        } catch (e) {}
-      }
-      await window.cloudStore.emitLiveEvent('upsert_request', req);
-    },
-
-    deleteRequest: async (reqId) => {
-      if (!reqId) return;
-      if (firestoreReady && db) {
-        try {
-          await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'oto_requests', reqId));
-        } catch (e) {}
-      }
-      await window.cloudStore.emitLiveEvent('delete_request', { id: reqId });
-    },
-
-    saveCalendarItem: async (item) => {
-      if (!item || !item.dateKey) return;
-      const docId = `${(item.empId || 'EMP').toUpperCase()}_${item.dateKey}`;
-      if (firestoreReady && db) {
-        try {
-          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'oto_calendar', docId), safeFirestorePayload({ ...item, docId }));
-        } catch (e) {}
-      }
-      await window.cloudStore.emitLiveEvent('upsert_calendar', item);
-    },
-
-    deleteCalendarItem: async (empId, dateKey) => {
-      if (!dateKey) return;
-      const docId = `${(empId || 'EMP').toUpperCase()}_${dateKey}`;
-      if (firestoreReady && db) {
-        try {
-          await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'oto_calendar', docId));
-        } catch (e) {}
-      }
-      await window.cloudStore.emitLiveEvent('delete_calendar', { empId: (empId || '').toUpperCase(), dateKey });
+        const s = await getDoc(doc(db, ...BASE, 'oto_photos', key));
+        if (s.exists() && s.data().data) {
+          obj.photo = s.data().data; changed = true;
+          photoSig.set(kind + '_' + id, obj.photo.length + ':' + obj.photo.slice(-48));
+        } else { photoFail.set(key, Date.now() + 60000); }
+      } catch (e) { photoFail.set(key, Date.now() + 30000); }
     }
   };
-
-  async function initCloudDatabase() {
-    connectRealtimeStreams();
-    await window.cloudStore.pullFromCloud(false);
-
-    setInterval(() => {
-      if (Date.now() - lastCloudPushAt > 1500) {
-        window.cloudStore.pullFromCloud(false);
-      }
-    }, 2500);
-
-    window.addEventListener('online', () => {
-      consecutiveFailures = 0;
-      connectRealtimeStreams();
-      window.cloudStore.pullFromCloud(false);
-    });
-
-    window.addEventListener('offline', () => {
-      setCloudBadge('ออฟไลน์ (ไม่พบสัญญาณเน็ต)', false);
-    });
-
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) {
-        connectRealtimeStreams();
-        window.cloudStore.pullFromCloud(false);
-      }
-    });
-
-    if (firebaseConfig) {
-      try {
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        db = getFirestore(app);
-
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-
-        firestoreReady = true;
-        setCloudBadge('ออนไลน์ · ซิงค์ข้ามเครื่องแล้ว ✓', true);
-
-        onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'oto_accounts'), (snap) => {
-          const list = [];
-          snap.forEach((d) => list.push(d.data()));
-          if (typeof window.syncAccountsFromCloud === 'function') window.syncAccountsFromCloud(list);
-        });
-
-        onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'oto_requests'), (snap) => {
-          const list = [];
-          snap.forEach((d) => list.push(d.data()));
-          if (typeof window.syncRequestsFromCloud === 'function') window.syncRequestsFromCloud(list);
-        });
-
-        onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'oto_calendar'), (snap) => {
-          const list = [];
-          snap.forEach((d) => list.push(d.data()));
-          if (typeof window.syncCalendarFromCloud === 'function') window.syncCalendarFromCloud(list);
-        });
-      } catch (err) {}
-    }
+  await Promise.all([worker(), worker(), worker()]);
+  if (changed) {
+    try { window.rebuildVisibleCalendarItems && window.rebuildVisibleCalendarItems(); window.renderApp && window.renderApp(); } catch (e) {}
   }
+}
 
-  initCloudDatabase();
+function listen(name, kind, applyList) {
+  onSnapshot(collection(db, ...BASE, name), { includeMetadataChanges: true }, (snap) => {
+    lastError = '';
+    const list = [], ids = new Set();
+    snap.forEach((d) => { list.push(d.data()); ids.add(d.id); });
+    const server = !snap.metadata.fromCache;
+    if (server) {
+      const prev = seen[kind] || [];
+      const suspicious = ids.size === 0 && prev.length > 2; // กันกรณีฐานข้อมูลว่างผิดปกติ ไม่ให้ลบข้อมูลในเครื่องทิ้งทั้งหมด
+      if (!suspicious) {
+        prev.filter((id) => !ids.has(id)).forEach((id) => applyDelete(kind, id));
+        seen[kind] = Array.from(ids); persistSeen();
+      }
+      lastIds[kind] = ids; first[kind] = true;
+    }
+    try { applyList(list); } catch (e) {}
+    if (server) uploadLocalOnly(kind);
+    if (kind !== 'accounts') schedulePhotos();
+    applyBadge();
+  }, (err) => {
+    lastError = (err && err.code) || 'error'; applyBadge();
+    if (err && err.code === 'permission-denied') toast('ฐานข้อมูลปฏิเสธการอ่าน (ตรวจ Firestore Rules / เปิด Anonymous Auth)');
+  });
+}
+
+function waitFirst(keys, ms) {
+  return new Promise((res) => {
+    if (!db || !navigator.onLine) return res();
+    const t0 = Date.now();
+    const iv = setInterval(() => {
+      if (keys.every((k) => first[k]) || Date.now() - t0 > ms) { clearInterval(iv); res(); }
+    }, 100);
+  });
+}
+
+// ---------- API เดิมของแอป (คงชื่อไว้ เพื่อไม่ต้องแก้โค้ดส่วนอื่น) ----------
+window.cloudStore = {
+  isReady: () => cloudOn,
+  getCloudUrl: () => '',
+  settingsReady: () => !cloudOn || first.settings || !navigator.onLine,
+  getSmHash: () => smHash,
+  setSmHash: (h) => put('oto_settings', 'sm', { pwHash: h, updatedAt: Date.now() }),
+  buildLocalSnapshot: () => (window.getAppSyncSnapshot ? window.getAppSyncSnapshot() : {}),
+  emitLiveEvent: async () => true,
+  setCustomCloudUrl: async (val) => {
+    const v = String(val || '').trim();
+    if (!v) { try { localStorage.removeItem(LS_CFG); } catch (e) {} }
+    else {
+      const j = parseCfgText(v);
+      if (!j || !j.apiKey || !j.projectId) { toast('Firebase config ไม่ถูกต้อง (ต้องมี apiKey และ projectId)'); return false; }
+      try { localStorage.setItem(LS_CFG, JSON.stringify(j)); } catch (e) {}
+    }
+    toast('บันทึกแล้ว กำลังโหลดใหม่…'); setTimeout(() => location.reload(), 900); return true;
+  },
+  pushFullSnapshot: async () => { ['accounts', 'requests', 'calendar'].forEach((k) => uploadLocalOnly(k)); return true; },
+  pullFromCloud: async (showNote = false) => {
+    if (!db) { if (showNote) toast('ยังไม่ได้ตั้งค่าฐานข้อมูลกลาง (ข้อมูลอยู่เฉพาะเครื่องนี้)'); return false; }
+    await waitFirst(['accounts', 'settings'], 6000);
+    ['accounts', 'requests', 'calendar'].forEach((k) => uploadLocalOnly(k));
+    schedulePhotos();
+    if (showNote) toast(navigator.onLine ? '☁️ ซิงค์ข้อมูลล่าสุดเรียบร้อยแล้ว' : '⚠️ ออฟไลน์ · ใช้ข้อมูลล่าสุดในเครื่อง');
+    return true;
+  },
+  fetchAccount: async (empId) => {
+    if (!db || !empId) return null;
+    try {
+      const id = String(empId).toUpperCase();
+      const s = await getDoc(doc(db, ...BASE, 'oto_accounts', safeId(id)));
+      if (!s.exists()) return null;
+      window.applyLiveEvent({ action: 'upsert_account', data: s.data() });
+      return (window.getAppSyncSnapshot().accounts || {})[id] || s.data();
+    } catch (e) { return null; }
+  },
+  saveAccount: async (acc) => {
+    if (!acc || !acc.empId || !db) return false;
+    const id = String(acc.empId).toUpperCase();
+    if (!acc.pwHash && acc.password && window.otoHash) acc.pwHash = await window.otoHash(id, acc.password);
+    delete acc.password;
+    const a = { ...acc, empId: id };
+    if (a.avatarPhoto && a.avatarPhoto.length > 40000) a.avatarPhoto = await shrink(a.avatarPhoto, 40000, 256);
+    return put('oto_accounts', id, { ...a, updatedAt: a.updatedAt || Date.now() });
+  },
+  deleteAccount: async (empId) => {
+    if (!db || !empId) return false;
+    const id = String(empId).toUpperCase();
+    const ok = await del('oto_accounts', id);
+    try {
+      for (const [name, kind] of [['oto_requests', 'req'], ['oto_calendar', 'cal']]) {
+        const qs = await getDocs(query(collection(db, ...BASE, name), where('empId', '==', id)));
+        qs.forEach((d) => {
+          deleteDoc(d.ref).catch(() => {});
+          deleteDoc(doc(db, ...BASE, 'oto_photos', safeId(kind + '_' + d.id))).catch(() => {});
+        });
+      }
+    } catch (e) {}
+    return ok;
+  },
+  saveRequest: async (req) => {
+    if (!req || !req.id || !db) return false;
+    const { photo, ...rest } = req;
+    const hasPhoto = Boolean(photo) || Boolean(req.hasPhoto);
+    if (photo) await savePhoto('req', req.id, photo);
+    return put('oto_requests', req.id, { ...rest, photo: '', hasPhoto, updatedAt: req.updatedAt || Date.now() });
+  },
+  deleteRequest: async (reqId) => {
+    if (!reqId || !db) return false;
+    del('oto_photos', 'req_' + reqId);
+    return del('oto_requests', reqId);
+  },
+  saveCalendarItem: async (item) => {
+    if (!item || !item.dateKey || !db) return false;
+    const docId = (item.empId || 'EMP').toUpperCase() + '_' + item.dateKey;
+    const { photo, ...rest } = item;
+    const hasPhoto = Boolean(photo) || Boolean(item.hasPhoto);
+    if (photo) await savePhoto('cal', docId, photo);
+    return put('oto_calendar', docId, { ...rest, docId, photo: '', hasPhoto, updatedAt: item.updatedAt || Date.now() });
+  },
+  deleteCalendarItem: async (empId, dateKey) => {
+    if (!dateKey || !db) return false;
+    const docId = (empId || 'EMP').toUpperCase() + '_' + dateKey;
+    del('oto_photos', 'cal_' + docId);
+    return del('oto_calendar', docId);
+  }
+};
+
+// ---------- เริ่มทำงาน ----------
+(async function init() {
+  const cfg = resolveConfig();
+  window.__otoCloudOn = false;
+  if (!cfg) { applyBadge(); return; }
+  if (seen.pid !== cfg.projectId) { seen = { accounts: [], requests: [], calendar: [], pid: cfg.projectId }; persistSeen(); }
+  try {
+    const app = initializeApp(cfg);
+    try {
+      db = initializeFirestore(app, {
+        localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+        experimentalAutoDetectLongPolling: true,
+        ignoreUndefinedProperties: true
+      });
+    } catch (e) { db = getFirestore(app); }
+    cloudOn = true; window.__otoCloudOn = true; applyBadge();
+    try {
+      const auth = getAuth(app);
+      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token);
+      else await signInAnonymously(auth);
+    } catch (e) {
+      toast('เปิด Anonymous Authentication ใน Firebase ก่อน (Authentication → Sign-in method)');
+    }
+    listen('oto_accounts', 'accounts', (list) => {
+      const map = {};
+      list.forEach((a) => { if (a && a.empId) map[String(a.empId).toUpperCase()] = a; });
+      window.syncAccountsFromCloud(list);
+    });
+    listen('oto_requests', 'requests', (list) => window.syncRequestsFromCloud(list));
+    listen('oto_calendar', 'calendar', (list) => window.syncCalendarFromCloud(list));
+    onSnapshot(doc(db, ...BASE, 'oto_settings', 'sm'), { includeMetadataChanges: true }, (s) => {
+      smHash = (s.exists() && s.data().pwHash) || '';
+      if (!s.metadata.fromCache) first.settings = true;
+    }, () => { first.settings = true; });
+  } catch (err) {
+    lastError = 'init'; applyBadge();
+  }
+})();
 </script>
 
 <script>
@@ -1003,7 +889,52 @@
 
   const APPROVER_ID = 'SM2080797';
   const APPROVER_NAME = 'นาย ณัฐวุฒิ ชุมหิรัญ';
-  const DEFAULT_APPROVER_PASS = '2080797';
+  const DEFAULT_APPROVER_PASS = ''; // เลิกเก็บรหัสผ่านตัวอักษรตรง ๆ ในโค้ด
+  const DEFAULT_SM_HASH = '6b0edaa8d206fbf22d3da5e5ffdff5291d14d5a86f403794f27dcda87441958c';
+  function sha256Hex(msg) {
+    const b = Array.from(new TextEncoder().encode(msg)), bitLen = b.length * 8;
+    b.push(0x80);
+    while (b.length % 64 !== 56) b.push(0);
+    for (let i = 7; i >= 0; i--) b.push(i > 3 ? 0 : (bitLen >>> (i * 8)) & 255);
+    const K = [], H = [];
+    const isPrime = (n) => { for (let d = 2; d * d <= n; d++) if (n % d === 0) return false; return true; };
+    for (let n = 2; K.length < 64; n++) {
+      if (!isPrime(n)) continue;
+      K.push(((Math.cbrt(n) % 1) * 4294967296) >>> 0);
+      if (H.length < 8) H.push(((Math.sqrt(n) % 1) * 4294967296) >>> 0);
+    }
+    const rr = (x, n) => (x >>> n) | (x << (32 - n));
+    for (let o = 0; o < b.length; o += 64) {
+      const w = new Array(64);
+      for (let i = 0; i < 16; i++) w[i] = (b[o + i * 4] << 24) | (b[o + i * 4 + 1] << 16) | (b[o + i * 4 + 2] << 8) | b[o + i * 4 + 3];
+      for (let i = 16; i < 64; i++) {
+        const s0 = rr(w[i - 15], 7) ^ rr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+        const s1 = rr(w[i - 2], 17) ^ rr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+        w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
+      }
+      let [a, bb, c, d, e, f, g, h] = H;
+      for (let i = 0; i < 64; i++) {
+        const S1 = rr(e, 6) ^ rr(e, 11) ^ rr(e, 25), ch = (e & f) ^ (~e & g), t1 = (h + S1 + ch + K[i] + w[i]) | 0;
+        const S0 = rr(a, 2) ^ rr(a, 13) ^ rr(a, 22), mj = (a & bb) ^ (a & c) ^ (bb & c), t2 = (S0 + mj) | 0;
+        h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = bb; bb = a; a = (t1 + t2) | 0;
+      }
+      H[0] = (H[0] + a) | 0; H[1] = (H[1] + bb) | 0; H[2] = (H[2] + c) | 0; H[3] = (H[3] + d) | 0;
+      H[4] = (H[4] + e) | 0; H[5] = (H[5] + f) | 0; H[6] = (H[6] + g) | 0; H[7] = (H[7] + h) | 0;
+    }
+    return H.map((x) => (x >>> 0).toString(16).padStart(8, '0')).join('');
+  }
+  async function otoHash(empId, pw) {
+    const msg = 'oto:' + String(empId || '').trim().toUpperCase() + ':' + String(pw);
+    try {
+      if (window.crypto && crypto.subtle) {
+        const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
+        return Array.from(new Uint8Array(h)).map((x) => x.toString(16).padStart(2, '0')).join('');
+      }
+    } catch (e) {}
+    return sha256Hex(msg);
+  }
+  window.otoHash = otoHash;
+
 
   const MOODS = [
     { id: 'happy', label: 'สดใส', bg: '#FFE6D5', mouth: 'M24 38C27 42 37 42 40 38', blush: true },
@@ -1094,8 +1025,15 @@
     return (state.user?.empId || '').trim().toUpperCase() === APPROVER_ID;
   }
 
+  window.getCurrentUserInfo = function () {
+    return { empId: (state.user && state.user.empId) || '', manager: isManager() };
+  };
+  window.renderApp = renderApp;
+  window.logoutUser = logoutUser;
+  window.rebuildVisibleCalendarItems = rebuildVisibleCalendarItems;
+
   function getSmPassword() {
-    return localStorage.getItem(LS_KEYS.smPass) || DEFAULT_APPROVER_PASS;
+    return localStorage.getItem(LS_KEYS.smPass) || '';
   }
 
   function ensureAccountFromMeta(empId, firstName, lastName, mood, avatarPhoto) {
@@ -1133,21 +1071,25 @@
   }
 
   window.persistLocalDatabase = function () {
-    try {
-      localStorage.setItem(LS_KEYS.accounts, JSON.stringify(registeredAccounts));
-      localStorage.setItem(LS_KEYS.requests, JSON.stringify(state.teamRequests));
-      localStorage.setItem(LS_KEYS.calendar, JSON.stringify(allCloudCalendarItems));
-      localStorage.setItem(LS_KEYS.tombstones, JSON.stringify({
-        accounts: Array.from(deletedAccountIds),
-        requests: Array.from(deletedRequestIds),
-        calendar: Array.from(deletedCalendarKeys)
-      }));
-      if (state.user) {
-        localStorage.setItem(LS_KEYS.session, JSON.stringify(state.user));
-      } else {
-        localStorage.removeItem(LS_KEYS.session);
+    const cloudOn = Boolean(window.__otoCloudOn);
+    const rep = (k, v) => {
+      if (typeof v === 'string' && (k === 'photo' || k === 'avatarPhoto')) {
+        const lim = k === 'avatarPhoto' ? 40000 : (cloudOn ? 2000 : 120000);
+        if (v.length > lim) return '';
       }
-    } catch (e) {}
+      return v;
+    };
+    const put = (key, val) => { try { localStorage.setItem(key, val); } catch (e) {} };
+    if (state.user) put(LS_KEYS.session, JSON.stringify(state.user, rep));
+    else { try { localStorage.removeItem(LS_KEYS.session); } catch (e) {} }
+    put(LS_KEYS.accounts, JSON.stringify(registeredAccounts, rep));
+    put(LS_KEYS.tombstones, JSON.stringify({
+      accounts: Array.from(deletedAccountIds),
+      requests: Array.from(deletedRequestIds),
+      calendar: Array.from(deletedCalendarKeys)
+    }));
+    put(LS_KEYS.requests, JSON.stringify(state.teamRequests, rep));
+    put(LS_KEYS.calendar, JSON.stringify(allCloudCalendarItems, rep));
   };
 
   window.getAppSyncSnapshot = function () {
@@ -1508,13 +1450,32 @@
     }
   }
 
-  function resetSmPasswordPrompt() {
-    const newPass = prompt('ตั้งรหัสผ่านใหม่สำหรับผู้อนุมัติ SM2080797 (ค่าเริ่มต้นคือ 2080797):', DEFAULT_APPROVER_PASS);
-    if (newPass && newPass.trim()) {
-      localStorage.setItem(LS_KEYS.smPass, newPass.trim());
-      document.getElementById('inpPassword').value = newPass.trim();
-      showToast('🔄 เปลี่ยนรหัสผ่าน SM2080797 เรียบร้อยแล้ว');
+  async function verifySmPassword(pass) {
+    const cs = window.cloudStore;
+    if (cs && cs.isReady() && !cs.settingsReady()) return 'wait';
+    const h = await otoHash(APPROVER_ID, pass);
+    const cloudHash = (cs && cs.getSmHash && cs.getSmHash()) || '';
+    if (cloudHash) return h === cloudHash;
+    const legacy = localStorage.getItem(LS_KEYS.smPass);
+    if (legacy && pass === legacy) {
+      if (cs && cs.isReady()) cs.setSmHash(h);
+      return true;
     }
+    return h === DEFAULT_SM_HASH;
+  }
+
+  async function resetSmPasswordPrompt() {
+    const cur = prompt('ใส่รหัสผ่าน SM ปัจจุบันเพื่อยืนยันตัวตน:');
+    if (cur === null) return;
+    const ok = await verifySmPassword(cur.trim());
+    if (ok !== true) { showToast(ok === 'wait' ? 'กำลังเชื่อมต่อฐานข้อมูล กรุณาลองใหม่อีกครั้ง' : 'รหัสผ่านปัจจุบันไม่ถูกต้อง'); return; }
+    const np = prompt('ตั้งรหัสผ่านใหม่สำหรับ SM2080797 (อย่างน้อย 6 ตัวอักษร):');
+    if (!np || np.trim().length < 6) { showToast('รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร'); return; }
+    if (!(window.cloudStore && window.cloudStore.isReady())) { showToast('ต้องเชื่อมฐานข้อมูลกลางก่อน จึงจะเปลี่ยนรหัสผ่านให้มีผลทุกเครื่องได้'); return; }
+    const h = await otoHash(APPROVER_ID, np.trim());
+    try { localStorage.removeItem(LS_KEYS.smPass); } catch (e) {}
+    await window.cloudStore.setSmHash(h);
+    showToast('🔄 เปลี่ยนรหัสผ่าน SM2080797 แล้ว (มีผลทุกเครื่อง)');
   }
 
   async function handleLogin() {
@@ -1533,9 +1494,9 @@
     }
 
     if (empId === APPROVER_ID) {
-      const validSmPass = getSmPassword();
-      if (pass !== validSmPass && pass !== DEFAULT_APPROVER_PASS && pass !== APPROVER_ID) {
-        showToast('รหัสผ่าน SM ไม่ถูกต้อง (กดปุ่ม 🔄 รีรหัสผ่าน SM ด้านบนได้)');
+      const smOk = await verifySmPassword(pass);
+      if (smOk !== true) {
+        showToast(smOk === 'wait' ? 'กำลังเชื่อมต่อฐานข้อมูล กรุณากดเข้าสู่ระบบอีกครั้ง' : 'รหัสผ่าน SM ไม่ถูกต้อง');
         return;
       }
       const existingSm = registeredAccounts[APPROVER_ID] || {};
@@ -1560,6 +1521,11 @@
         showToast('กรุณาตั้งรหัสผ่าน');
         return;
       }
+      const dup = registeredAccounts[empId] || (window.cloudStore && window.cloudStore.fetchAccount ? await window.cloudStore.fetchAccount(empId) : null);
+      if (dup && (dup.pwHash || dup.password)) {
+        showToast('รหัสพนักงานนี้มีผู้ใช้งานแล้ว กรุณากดเข้าสู่ระบบ หรือใช้รหัสอื่น');
+        return;
+      }
       if (deletedAccountIds.has(empId)) {
         deletedAccountIds.delete(empId);
       }
@@ -1567,7 +1533,7 @@
         empId,
         firstName: first,
         lastName: last,
-        password: pass,
+        pwHash: await otoHash(empId, pass),
         mood: 'happy',
         avatarPhoto: '',
         updatedAt: Date.now()
@@ -1576,19 +1542,39 @@
       state.user = { ...acc };
       window.persistLocalDatabase();
       if (window.cloudStore) await window.cloudStore.saveAccount(acc);
-      showToast(`✨ สร้างรหัส ${empId} สำเร็จ!`);
+      showToast(window.__otoCloudOn ? `✨ สร้างรหัส ${empId} สำเร็จ! ส่งขึ้นระบบกลางแล้ว` : `✨ สร้างรหัส ${empId} สำเร็จ! (บันทึกในเครื่องนี้ ยังไม่ได้เชื่อมฐานข้อมูลกลาง)`);
       enterAuthenticatedApp();
       return;
     }
 
-    const acc = registeredAccounts[empId];
+    let acc = registeredAccounts[empId];
+    if (!acc && window.cloudStore && window.cloudStore.fetchAccount) {
+      acc = await window.cloudStore.fetchAccount(empId);
+    }
     if (!acc) {
       showToast('ไม่พบรหัสพนักงานนี้ กดปุ่ม "✨ สร้างรหัสพนักงาน" ด้านบนเพื่อลงทะเบียน');
       return;
     }
-    if (acc.password && pass !== acc.password) {
-      showToast('รหัสผ่านไม่ถูกต้อง กรุณาลองอีกครั้ง');
-      return;
+    if (acc.pwHash) {
+      if ((await otoHash(empId, pass)) !== acc.pwHash) {
+        showToast('รหัสผ่านไม่ถูกต้อง กรุณาลองอีกครั้ง');
+        return;
+      }
+    } else {
+      if (acc.password && pass !== acc.password) {
+        showToast('รหัสผ่านไม่ถูกต้อง กรุณาลองอีกครั้ง');
+        return;
+      }
+      if (!pass) {
+        showToast('บัญชีนี้ยังไม่มีรหัสผ่าน กรุณาพิมพ์รหัสผ่านใหม่ที่ต้องการตั้ง');
+        return;
+      }
+      acc.pwHash = await otoHash(empId, pass);
+      delete acc.password;
+      acc.updatedAt = Date.now();
+      registeredAccounts[empId] = acc;
+      window.persistLocalDatabase();
+      if (window.cloudStore) window.cloudStore.saveAccount(acc);
     }
 
     state.user = { ...acc };
@@ -2687,12 +2673,12 @@
           <h3 class="text-sm font-bold">☁️ การซิงค์ฐานข้อมูลกลางข้ามเครื่อง</h3>
           <button type="button" onclick="window.cloudStore && window.cloudStore.pullFromCloud(true)" class="comic-pill px-3 py-1 text-[11px] bg-[#c6f3dc]">🔄 ซิงค์ขึ้น-ลงเดี๋ยวนี้</button>
         </div>
-        <p class="text-[11px] text-[#7a76a3]">ระบบส่งคำขอแบบยิงตรงทันที + ซิงค์ข้อมูลทุก 2.5 วินาที พร้อมรวมรายชื่อพนักงานอัตโนมัติ</p>
+        <p class="text-[11px] text-[#7a76a3]">ซิงค์แบบเรียลไทม์ผ่านฐานข้อมูลกลาง (Firestore) · คำขอและรายชื่อพนักงานส่งถึง SM ทันที ถ้าเน็ตหลุดจะเก็บคิวไว้แล้วส่งให้อัตโนมัติ</p>
         ${manager ? `
           <div class="mt-2.5 pt-2.5 border-t border-dashed border-[#c7c3ea]">
-            <label class="block text-[11px] font-bold mb-1">🔗 ลิงก์ฐานข้อมูลส่วนตัว (JSON / Firebase URL — ไม่บังคับ)</label>
+            <label class="block text-[11px] font-bold mb-1">🔥 Firebase config (วางทั้งก้อน — ใช้ทดสอบเครื่องนี้ ปกติฝังไว้ในไฟล์)</label>
             <div class="flex gap-1.5">
-              <input id="inpCustomCloudUrl" type="url" value="${localStorage.getItem('oto_central_blob_url_v9') || ''}" class="comic-input !py-1.5 !text-xs" placeholder="วาง URL เช่น https://xxx.firebaseio.com/oto.json" />
+              <input id="inpCustomCloudUrl" type="text" value="" class="comic-input !py-1.5 !text-xs" placeholder='วาง {"apiKey":"…","projectId":"…"}' />
               <button type="button" onclick="saveCustomCloudUrlSetting()" class="comic-pill px-3 py-1.5 text-[11px] bg-[#ffe6d3] shrink-0">บันทึก</button>
             </div>
           </div>
@@ -2746,7 +2732,7 @@
     const val = (document.getElementById('inpCustomCloudUrl')?.value || '').trim();
     if (window.cloudStore && window.cloudStore.setCustomCloudUrl) {
       await window.cloudStore.setCustomCloudUrl(val);
-      showToast(val ? '☁️ เชื่อมต่อลิงก์ฐานข้อมูลส่วนตัวเรียบร้อย' : '☁️ กลับไปใช้ฐานข้อมูลกลางมาตรฐานแล้ว');
+      if (val) showToast('☁️ บันทึก Firebase config แล้ว');
     }
   }
 
