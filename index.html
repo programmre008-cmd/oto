@@ -596,7 +596,7 @@ const put = (name, id, data) => db ? write(() => setDoc(doc(db, ...BASE, name, s
 const del = (name, id) => db ? write(() => deleteDoc(doc(db, ...BASE, name, safeId(id)))) : Promise.resolve(false);
 
 // ---------- บีบอัดรูป (รูปแยกเก็บคนละคอลเลกชัน ให้รายการเบาและเร็ว) ----------
-function shrink(dataUrl, maxLen = 110000, maxW = 640) {
+function shrink(dataUrl, maxLen = 130000, maxW = 720) {
   if (!dataUrl || dataUrl.length <= maxLen) return Promise.resolve(dataUrl);
   return new Promise((resolve) => {
     const img = new Image();
@@ -867,7 +867,8 @@ window.cloudStore = {
       list.forEach((a) => { if (a && a.empId) map[String(a.empId).toUpperCase()] = a; });
       window.syncAccountsFromCloud(list);
     });
-    listen('oto_requests', 'requests', (list) => window.syncRequestsFromCloud(list));
+    listen('oto_requests', 'requests', (list) => { window.syncRequestsFromCloud(list); if (window.dedupeRequests) window.dedupeRequests(); });
+    setInterval(() => { if (window.dedupeRequests) window.dedupeRequests(); }, 8000);
     listen('oto_calendar', 'calendar', (list) => window.syncCalendarFromCloud(list));
     onSnapshot(doc(db, ...BASE, 'oto_settings', 'sm'), { includeMetadataChanges: true }, (s) => {
       smHash = (s.exists() && s.data().pwHash) || '';
@@ -1038,6 +1039,32 @@ window.cloudStore = {
   window.renderApp = renderApp;
   window.logoutUser = logoutUser;
   window.rebuildVisibleCalendarItems = rebuildVisibleCalendarItems;
+  window.dedupeRequests = function () {
+    if (!state.user || !isManager()) return false;
+    const groups = new Map();
+    state.teamRequests.forEach(r => {
+      if (r.status !== 'submitted') return;
+      const k = `${(r.empId || '').toUpperCase()}|${r.type}|${r.from}`;
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(r);
+    });
+    const drop = [];
+    groups.forEach(list => {
+      if (list.length < 2) return;
+      list.sort((a, b) => (Number(Boolean(b.photo || b.hasPhoto)) - Number(Boolean(a.photo || a.hasPhoto))) || ((b.updatedAt || 0) - (a.updatedAt || 0)));
+      drop.push(...list.slice(1));
+    });
+    if (!drop.length) return false;
+    drop.forEach(r => {
+      deletedRequestIds.add(r.id);
+      if (window.cloudStore) window.cloudStore.deleteRequest(r.id);
+    });
+    state.teamRequests = state.teamRequests.filter(r => !drop.includes(r));
+    window.persistLocalDatabase();
+    renderApp();
+    showToast(`ลบคำขอซ้ำออกให้ ${drop.length} รายการแล้ว`);
+    return true;
+  };
 
   function getSmPassword() {
     return localStorage.getItem(LS_KEYS.smPass) || '';
@@ -1879,8 +1906,16 @@ window.cloudStore = {
   let currentCheckoutLocation = '';
   let activeCameraStream = null;
   let cameraFacingMode = 'environment';
+  let draft = { timeIn: '', timeOut: '', note: '', leaveFrom: '', leaveTo: '' };
+  let currentCheckoutAddress = '';
+  let currentGpsCoords = '';
+  let cameraMirror = false;
+  let cameraRaf = 0;
+  let savingEntry = false;
+  let stampCode = '';
 
   function stopLiveCamera() {
+    if (cameraRaf) { cancelAnimationFrame(cameraRaf); cameraRaf = 0; }
     if (activeCameraStream) {
       activeCameraStream.getTracks().forEach(t => t.stop());
       activeCameraStream = null;
@@ -1904,13 +1939,21 @@ window.cloudStore = {
         const lat = pos.coords.latitude.toFixed(5);
         const lon = pos.coords.longitude.toFixed(5);
         currentCheckoutLocation = `พิกัด ${lat}, ${lon}`;
+        currentGpsCoords = `${lat}, ${lon}`;
         try {
-          const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=th`);
+          const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&addressdetails=1&lat=${lat}&lon=${lon}&accept-language=th`);
           if (resp.ok) {
             const geo = await resp.json();
-            if (geo && geo.display_name) {
-              const parts = geo.display_name.split(',').slice(0, 3).join(' ');
-              currentCheckoutLocation = parts.trim();
+            const ad = (geo && geo.address) || {};
+            const l1 = [[ad.house_number, ad.road].filter(Boolean).join(' '), ad.neighbourhood || ad.suburb].filter(Boolean).join(' ');
+            const l2 = [ad.city_district || ad.county || ad.city || ad.town, ad.state, ad.postcode].filter(Boolean).join(' ');
+            const addr = [l1, l2].filter(Boolean).join(' ').trim();
+            if (addr) {
+              currentCheckoutAddress = addr;
+              currentCheckoutLocation = addr;
+            } else if (geo && geo.display_name) {
+              currentCheckoutAddress = geo.display_name.split(',').slice(0, 4).join(' ').trim();
+              currentCheckoutLocation = currentCheckoutAddress;
             }
           }
         } catch (e) {}
@@ -1949,6 +1992,15 @@ window.cloudStore = {
     currentCheckoutLocation = (existing && existing.checkoutLocation) ? existing.checkoutLocation : '';
     editingType = existing ? existing.type : 'ot';
     editingMood = existing ? (existing.mood || 'happy') : 'happy';
+    currentCheckoutAddress = '';
+    currentGpsCoords = '';
+    draft = {
+      timeIn: (existing && existing.timeIn) || '',
+      timeOut: (existing && existing.timeOut) || '',
+      note: (existing && existing.note) || '',
+      leaveFrom: dateKey,
+      leaveTo: (existing && existing.to) || dateKey
+    };
 
     renderDaySheet();
     document.getElementById('daySheet').classList.add('open');
@@ -1960,25 +2012,36 @@ window.cloudStore = {
     currentPhoto = '';
     currentCheckoutTime = '';
     currentCheckoutLocation = '';
+    currentCheckoutAddress = '';
+    currentGpsCoords = '';
+    draft = { timeIn: '', timeOut: '', note: '', leaveFrom: '', leaveTo: '' };
     document.getElementById('daySheet').classList.remove('open');
   }
 
   function setEntryType(type) {
+    captureDraft();
     editingType = type;
     renderDaySheet();
   }
 
   function setEntryMood(moodId) {
+    captureDraft();
     editingMood = moodId;
     renderDaySheet();
   }
 
   function renderDaySheet() {
-    const existing = state.items[editingDateKey] || {};
-    const timeIn = existing.timeIn || '18:00';
-    const timeOut = existing.timeOut || '21:00';
-    const note = existing.note || '';
-    const leaveTo = existing.to || editingDateKey;
+    captureDraft();
+    renderDaySheetRaw();
+    refreshSaveState();
+  }
+
+  function renderDaySheetRaw() {
+    const timeIn = escAttr(draft.timeIn);
+    const timeOut = escAttr(draft.timeOut);
+    const note = escAttr(draft.note);
+    const leaveFrom = draft.leaveFrom || editingDateKey;
+    const leaveTo = draft.leaveTo || leaveFrom;
 
     const sheet = document.getElementById('daySheetContent');
     sheet.innerHTML = `
@@ -2003,23 +2066,23 @@ window.cloudStore = {
       ${editingType === 'ot' ? `
         <div class="grid grid-cols-2 gap-2.5 mb-3">
           <div>
-            <label class="block text-xs font-bold mb-1">เวลาเริ่ม OT</label>
-            <input id="inpTimeIn" type="time" value="${timeIn}" class="comic-input" />
+            <label class="block text-xs font-bold mb-1">เวลาเริ่ม OT <span class="text-[#e11d48]">*</span></label>
+            <input id="inpTimeIn" type="time" value="${timeIn}" oninput="refreshSaveState()" onchange="refreshSaveState()" class="comic-input" />
           </div>
           <div>
-            <label class="block text-xs font-bold mb-1">เวลาเลิก OT</label>
-            <input id="inpTimeOut" type="time" value="${timeOut}" class="comic-input" />
+            <label class="block text-xs font-bold mb-1">เวลาเลิก OT <span class="text-[#e11d48]">*</span></label>
+            <input id="inpTimeOut" type="time" value="${timeOut}" oninput="refreshSaveState()" onchange="refreshSaveState()" class="comic-input" />
           </div>
         </div>
       ` : `
         <div class="grid grid-cols-2 gap-2.5 mb-3">
           <div>
             <label class="block text-xs font-bold mb-1">วันที่เริ่มลา</label>
-            <input id="inpLeaveFrom" type="date" value="${editingDateKey}" class="comic-input" />
+            <input id="inpLeaveFrom" type="date" value="${leaveFrom}" oninput="refreshSaveState()" onchange="refreshSaveState()" class="comic-input" />
           </div>
           <div>
             <label class="block text-xs font-bold mb-1">ถึงวันที่</label>
-            <input id="inpLeaveTo" type="date" value="${leaveTo}" class="comic-input" />
+            <input id="inpLeaveTo" type="date" value="${leaveTo}" oninput="refreshSaveState()" onchange="refreshSaveState()" class="comic-input" />
           </div>
         </div>
       `}
@@ -2037,23 +2100,25 @@ window.cloudStore = {
       </div>
 
       <div class="mb-3">
-        <label class="block text-xs font-bold mb-1">รายละเอียด / หมายเหตุ</label>
-        <input id="inpNote" type="text" value="${note}" class="comic-input" placeholder="${editingType === 'ot' ? 'เช่น ปิดยอดประจำวัน / เคลียร์สต็อก' : 'เช่น ลาพักร้อนประจำปี'}" />
+        <label class="block text-xs font-bold mb-1">รายละเอียด / หมายเหตุ ${editingType === 'ot' ? '<span class="text-[#e11d48]">*</span>' : '(ไม่บังคับ)'}</label>
+        <input id="inpNote" type="text" value="${note}" oninput="refreshSaveState()" class="comic-input" placeholder="${editingType === 'ot' ? 'เช่น ปิดยอดประจำวัน / เคลียร์สต็อก' : 'เช่น ลาพักร้อนประจำปี'}" />
       </div>
 
       ${editingType === 'ot' ? `
         <div class="comic-card p-3 mb-3 bg-white">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-bold">📸 รูปถ่ายเช็คเอาท์ + เวลา & GPS จริง</span>
+            <span class="text-xs font-bold">📸 รูปถ่ายเช็คเอาท์ + เวลา & GPS จริง <span class="text-[#e11d48]">*</span></span>
             <span id="gpsStatusLabel" class="text-[10px] text-[#0d9488] font-bold truncate max-w-[165px]">
               ${currentCheckoutLocation ? `📍 ${currentCheckoutLocation}` : 'พร้อมรับพิกัด GPS'}
             </span>
           </div>
 
           <div id="liveCameraContainer" class="hidden mb-2.5">
-            <video id="liveCameraVideo" autoplay playsinline muted class="w-full h-52 object-cover rounded-2xl border-2 border-[#1e1b4b] bg-black"></video>
-            <div class="grid grid-cols-3 gap-1.5 mt-2">
+            <video id="liveCameraVideo" autoplay playsinline muted style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"></video>
+            <canvas id="liveCameraCanvas" width="480" height="640" class="w-full rounded-2xl border-2 border-[#1e1b4b] bg-black" style="max-height:62vh;object-fit:contain"></canvas>
+            <div class="grid grid-cols-2 gap-1.5 mt-2">
               <button type="button" onclick="switchCameraFacing()" class="comic-pill py-2 text-[11px] bg-[#e5e2ff]">🔄 สลับกล้อง</button>
+              <button type="button" onclick="toggleCameraMirror()" class="comic-pill py-2 text-[11px] bg-[#fff1b8]">↔️ กลับภาพซ้าย-ขวา</button>
               <button type="button" onclick="captureLivePhoto()" class="comic-btn py-2 text-xs bg-[#c6f3dc]">📸 กดถ่ายรูป</button>
               <button type="button" onclick="stopLiveCamera()" class="comic-pill py-2 text-[11px] bg-[#ffd6e0]">✕ ปิดกล้อง</button>
             </div>
@@ -2061,7 +2126,7 @@ window.cloudStore = {
 
           ${currentPhoto ? `
             <div class="relative mb-2">
-              <img src="${currentPhoto}" class="w-full h-44 object-cover rounded-2xl border-2 border-[#1e1b4b]" alt="เช็คเอาท์" />
+              <img src="${currentPhoto}" class="w-full max-h-96 object-contain bg-black rounded-2xl border-2 border-[#1e1b4b]" alt="เช็คเอาท์" />
               <button type="button" onclick="clearCheckoutPhoto()" class="absolute top-2 right-2 px-2.5 py-1 rounded-full bg-[#ffd6e0] border border-[#1e1b4b] text-[11px] font-bold">🗑️ ลบรูป</button>
             </div>
           ` : `
@@ -2081,19 +2146,196 @@ window.cloudStore = {
         </div>
       ` : ''}
 
-      <button type="button" onclick="saveCurrentEntry()" class="comic-btn w-full py-3.5 bg-[#ffb98a] text-[#1e1b4b] text-sm">
+      <p id="entryProgress" class="text-[11px] font-bold text-center mb-1.5"></p>
+      <button id="btnSaveEntry" type="button" onclick="saveCurrentEntry()" class="comic-btn w-full py-3.5 bg-[#ffb98a] text-[#1e1b4b] text-sm">
         ${editingType === 'ot' ? 'ส่งคำขอทำโอที (OT) ไปที่ SM2080797' : 'ส่งคำขอลาพักร้อนไปที่ SM2080797'}
       </button>
     `;
   }
 
+  const TH_DOW = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+  const TH_MON = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+
+  function thaiNowParts() {
+    const now = new Date();
+    const th = new Date(now.getTime() + now.getTimezoneOffset() * 60000 + 7 * 3600000);
+    return {
+      hh: String(th.getHours()).padStart(2, '0'),
+      mm: String(th.getMinutes()).padStart(2, '0'),
+      dow: TH_DOW[th.getDay()],
+      d: String(th.getDate()).padStart(2, '0'),
+      mon: TH_MON[th.getMonth()],
+      y: th.getFullYear() + 543
+    };
+  }
+
+  function makeStampCode() {
+    const base = Date.now().toString(36) + ((state.user && state.user.empId) || '');
+    return base.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(-12);
+  }
+
+  function rrPath(ctx, x, y, w, h, tl, tr, br, bl) {
+    ctx.beginPath();
+    ctx.moveTo(x + tl, y);
+    ctx.lineTo(x + w - tr, y);
+    if (tr) ctx.arcTo(x + w, y, x + w, y + tr, tr);
+    ctx.lineTo(x + w, y + h - br);
+    if (br) ctx.arcTo(x + w, y + h, x + w - br, y + h, br);
+    ctx.lineTo(x + bl, y + h);
+    if (bl) ctx.arcTo(x, y + h, x, y + h - bl, bl);
+    ctx.lineTo(x, y + tl);
+    if (tl) ctx.arcTo(x, y, x + tl, y, tl);
+    ctx.closePath();
+  }
+
+  function wrapText(ctx, text, maxW) {
+    const words = String(text).split(/\s+/).filter(Boolean);
+    const lines = [];
+    let cur = '';
+    words.forEach((w) => {
+      const t = cur ? cur + ' ' + w : w;
+      if (ctx.measureText(t).width <= maxW) { cur = t; return; }
+      if (cur) lines.push(cur);
+      if (ctx.measureText(w).width <= maxW) { cur = w; return; }
+      let part = '';
+      for (const ch of w) {
+        if (ctx.measureText(part + ch).width > maxW) { lines.push(part); part = ch; } else { part += ch; }
+      }
+      cur = part;
+    });
+    if (cur) lines.push(cur);
+    return lines;
+  }
+
+  // ประทับเวลา/วันที่/ที่อยู่ลงบนภาพ ตามสไตล์แอปตอกบัตร (ป้ายเหลือง + เวลาใหญ่ + วันที่ + ที่อยู่)
+  function drawStamp(ctx, W, H) {
+    const p = thaiNowParts();
+    const u = W / 667;
+    const FONT = 'Kanit, Anuphan, sans-serif';
+    ctx.save();
+    const g = ctx.createLinearGradient(0, H * 0.5, 0, H);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(1, 'rgba(0,0,0,0.62)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, H * 0.5, W, H * 0.5);
+
+    const x0 = 16 * u, tx = x0 + 14 * u;
+    const addr = currentCheckoutAddress || (/^พิกัด/.test(currentCheckoutLocation || '') ? currentCheckoutLocation : 'ไม่พบตำแหน่ง GPS');
+    ctx.font = `500 ${22 * u}px ${FONT}`;
+    const lines = wrapText(ctx, addr, W * 0.74).slice(0, 3);
+    const coordLine = currentGpsCoords ? `Lat/Long ${currentGpsCoords}` : '';
+    const rows = lines.length + (coordLine ? 1 : 0);
+    const lh = 29 * u;
+    const footBase = H - 14 * u;
+    const addrBottom = footBase - 36 * u;
+    const addrTop = addrBottom - rows * lh;
+    const dateBase = addrTop - 8 * u;
+    const dateTop = dateBase - 30 * u;
+    const pillH = 54 * u;
+    const pillY = dateTop - 14 * u - pillH;
+
+    const lab = 'เช็คเอาท์';
+    ctx.font = `700 ${27 * u}px ${FONT}`;
+    const lw = ctx.measureText(lab).width + 30 * u;
+    const tm = `${p.hh}:${p.mm}`;
+    ctx.font = `700 ${42 * u}px ${FONT}`;
+    const tw = ctx.measureText(tm).width + 30 * u;
+    rrPath(ctx, x0, pillY, lw, pillH, 10 * u, 0, 0, 10 * u);
+    ctx.fillStyle = '#FFC21A'; ctx.fill();
+    rrPath(ctx, x0 + lw, pillY, tw, pillH, 0, 10 * u, 10 * u, 0);
+    ctx.fillStyle = '#FFFFFF'; ctx.fill();
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#1b1740';
+    ctx.font = `700 ${27 * u}px ${FONT}`;
+    ctx.fillText(lab, x0 + 15 * u, pillY + pillH / 2 + 1 * u);
+    ctx.font = `700 ${42 * u}px ${FONT}`;
+    ctx.fillText(tm, x0 + lw + 15 * u, pillY + pillH / 2 + 1 * u);
+
+    ctx.fillStyle = '#FFA21A';
+    ctx.fillRect(x0, dateTop, 4 * u, addrBottom - dateTop);
+
+    ctx.textBaseline = 'alphabetic';
+    ctx.shadowColor = 'rgba(0,0,0,0.7)';
+    ctx.shadowBlur = 5 * u;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = `700 ${28 * u}px ${FONT}`;
+    ctx.fillText(`${p.dow}, ${p.d} ${p.mon} ${p.y}`, tx, dateBase);
+    ctx.font = `500 ${22 * u}px ${FONT}`;
+    lines.forEach((ln, i) => ctx.fillText(ln, tx, addrTop + (i + 1) * lh - 7 * u));
+    if (coordLine) {
+      ctx.font = `400 ${17 * u}px ${FONT}`;
+      ctx.fillText(coordLine, tx, addrTop + rows * lh - 8 * u);
+    }
+
+    ctx.fillStyle = '#36C78C';
+    ctx.beginPath(); ctx.arc(x0 + 9 * u, footBase - 7 * u, 9 * u, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = `700 ${13 * u}px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.fillText('✓', x0 + 9 * u, footBase - 2.5 * u);
+    ctx.textAlign = 'left';
+    ctx.font = `500 ${18 * u}px ${FONT}`;
+    ctx.fillText('oto บันทึกเวลา & ตำแหน่ง', x0 + 26 * u, footBase);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#FFB98A';
+    ctx.font = `700 ${34 * u}px ${FONT}`;
+    ctx.fillText('oto', W - 18 * u, footBase - 22 * u);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = `500 ${16 * u}px ${FONT}`;
+    ctx.fillText('ภาพจริง 100%', W - 18 * u, footBase);
+
+    ctx.shadowBlur = 0;
+    ctx.save();
+    ctx.translate(W - 20 * u, 34 * u);
+    ctx.rotate(Math.PI / 2);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.font = `500 ${15 * u}px ${FONT}`;
+    ctx.fillText(`● oto Timestamp · ${stampCode || 'OTO'}`, 0, 0);
+    ctx.restore();
+    ctx.restore();
+  }
+
+  function paintFrame(ctx, src, W, H) {
+    ctx.save();
+    if (cameraMirror) { ctx.translate(W, 0); ctx.scale(-1, 1); }
+    ctx.drawImage(src, 0, 0, W, H);
+    ctx.restore();
+  }
+
+  function startCameraLoop() {
+    const v = document.getElementById('liveCameraVideo');
+    const c = document.getElementById('liveCameraCanvas');
+    if (!v || !c) return;
+    let last = 0;
+    const loop = (ts) => {
+      if (!activeCameraStream) return;
+      if (ts - last > 45 && v.videoWidth) {
+        last = ts;
+        const W = Math.min(v.videoWidth, 720);
+        const H = Math.round(v.videoHeight * W / v.videoWidth);
+        if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+        const ctx = c.getContext('2d');
+        paintFrame(ctx, v, W, H);
+        drawStamp(ctx, W, H);
+      }
+      cameraRaf = requestAnimationFrame(loop);
+    };
+    cameraRaf = requestAnimationFrame(loop);
+  }
+
   async function startLiveCamera(facing) {
     cameraFacingMode = facing || 'environment';
-    await fetchCurrentGpsLocation();
+    stampCode = makeStampCode();
+    fetchCurrentGpsLocation();
     try {
       stopLiveCamera();
+      if (document.fonts && document.fonts.load) {
+        try { await Promise.all([document.fonts.load('700 24px Kanit'), document.fonts.load('500 22px Kanit')]); } catch (e) {}
+      }
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: cameraFacingMode },
+        video: { facingMode: cameraFacingMode, width: { ideal: 1280 } },
         audio: false
       });
       activeCameraStream = stream;
@@ -2102,6 +2344,8 @@ window.cloudStore = {
       if (camBox && videoEl) {
         camBox.classList.remove('hidden');
         videoEl.srcObject = stream;
+        try { await videoEl.play(); } catch (e) {}
+        startCameraLoop();
       }
     } catch (err) {
       showToast('ไม่สามารถเปิดกล้องสดได้ กรุณากดเลือกรูปจากอัลบั้มด้านล่าง');
@@ -2113,49 +2357,24 @@ window.cloudStore = {
     startLiveCamera(nextFacing);
   }
 
-  function stampWatermarkOnCanvas(sourceEl, width, height) {
-    const canvas = document.createElement('canvas');
-    const maxW = 640;
-    const scale = width > maxW ? maxW / width : 1;
-    canvas.width = Math.round(width * scale);
-    canvas.height = Math.round(height * scale);
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(sourceEl, 0, 0, canvas.width, canvas.height);
-
-    const now = new Date();
-    const utc = now.getTime() + now.getTimezoneOffset() * 60000;
-    const th = new Date(utc + 7 * 3600000);
-    const timeStr = `${String(th.getHours()).padStart(2, '0')}:${String(th.getMinutes()).padStart(2, '0')}`;
-    currentCheckoutTime = timeStr;
-    const locStr = currentCheckoutLocation || 'ยืนยันพิกัด GPS แล้ว';
-
-    const pad = 12;
-    const boxH = 68;
-    const y0 = canvas.height - boxH - pad;
-    ctx.fillStyle = 'rgba(20, 18, 52, 0.82)';
-    ctx.beginPath();
-    ctx.roundRect(pad, y0, canvas.width - pad * 2, boxH, 12);
-    ctx.fill();
-
-    ctx.fillStyle = '#FFB98A';
-    ctx.font = 'bold 16px Kanit, sans-serif';
-    ctx.fillText(`เช็คเอาท์ ${timeStr} น. · ${formatThaiShort(editingDateKey)}`, pad + 12, y0 + 24);
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = '13px Anuphan, sans-serif';
-    ctx.fillText(`📍 ${locStr.slice(0, 48)}`, pad + 12, y0 + 46);
-
-    ctx.fillStyle = '#36C78C';
-    ctx.font = 'bold 11px Anuphan, sans-serif';
-    ctx.fillText('✓ oto GPS & Time Verified', pad + 12, y0 + 62);
-
-    return canvas.toDataURL('image/jpeg', 0.52);
+  function toggleCameraMirror() {
+    cameraMirror = !cameraMirror;
+    showToast(cameraMirror ? 'กลับภาพซ้าย-ขวา: เปิด' : 'กลับภาพซ้าย-ขวา: ปิด (ภาพที่บันทึกตรงกับที่เห็น)');
   }
 
   function captureLivePhoto() {
-    const videoEl = document.getElementById('liveCameraVideo');
-    if (!videoEl || !videoEl.videoWidth) return;
-    currentPhoto = stampWatermarkOnCanvas(videoEl, videoEl.videoWidth, videoEl.videoHeight);
+    const v = document.getElementById('liveCameraVideo');
+    if (!v || !v.videoWidth) { showToast('กล้องยังไม่พร้อม กรุณารอสักครู่'); return; }
+    const W = Math.min(v.videoWidth, 960);
+    const H = Math.round(v.videoHeight * W / v.videoWidth);
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const ctx = c.getContext('2d');
+    paintFrame(ctx, v, W, H);
+    const p = thaiNowParts();
+    currentCheckoutTime = `${p.hh}:${p.mm}`;
+    drawStamp(ctx, W, H);
+    currentPhoto = c.toDataURL('image/jpeg', 0.8);
     stopLiveCamera();
     renderDaySheet();
   }
@@ -2167,7 +2386,18 @@ window.cloudStore = {
     reader.onload = (e) => {
       const img = new Image();
       img.onload = () => {
-        currentPhoto = stampWatermarkOnCanvas(img, img.width, img.height);
+        const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+        const W = Math.min(iw, 960);
+        const H = Math.round(ih * W / iw);
+        const c = document.createElement('canvas');
+        c.width = W; c.height = H;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0, W, H);
+        stampCode = makeStampCode();
+        const p = thaiNowParts();
+        currentCheckoutTime = `${p.hh}:${p.mm}`;
+        drawStamp(ctx, W, H);
+        currentPhoto = c.toDataURL('image/jpeg', 0.8);
         event.target.value = '';
         renderDaySheet();
       };
@@ -2184,113 +2414,129 @@ window.cloudStore = {
     renderDaySheet();
   }
 
-  async function saveCurrentEntry() {
-    if (!state.user || isManager()) return;
-    const empId = state.user.empId.trim().toUpperCase();
-    const note = (document.getElementById('inpNote')?.value || '').trim();
+  function escAttr(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  }
 
-    if (!registeredAccounts[empId] && !deletedAccountIds.has(empId)) {
-      registeredAccounts[empId] = {
-        empId,
-        firstName: state.user.firstName || `พนักงาน ${empId}`,
-        lastName: state.user.lastName || '',
-        password: state.user.password || '',
-        mood: state.user.mood || 'happy',
-        avatarPhoto: state.user.avatarPhoto || '',
-        updatedAt: Date.now()
-      };
-    }
+  function captureDraft() {
+    const g = (id) => document.getElementById(id);
+    if (g('inpTimeIn')) draft.timeIn = g('inpTimeIn').value;
+    if (g('inpTimeOut')) draft.timeOut = g('inpTimeOut').value;
+    if (g('inpNote')) draft.note = g('inpNote').value;
+    if (g('inpLeaveFrom')) draft.leaveFrom = g('inpLeaveFrom').value;
+    if (g('inpLeaveTo')) draft.leaveTo = g('inpLeaveTo').value;
+  }
 
+  function isHHMM(t) { return /^([01]\d|2[0-3]):[0-5]\d$/.test(t || ''); }
+
+  function entryValidation() {
+    captureDraft();
+    const missing = [];
+    let total;
     if (editingType === 'ot') {
-      const timeIn = document.getElementById('inpTimeIn')?.value || '18:00';
-      const timeOut = document.getElementById('inpTimeOut')?.value || '21:00';
-      const hours = calcHours(timeIn, timeOut);
-
-      const calItem = {
-        dateKey: editingDateKey,
-        empId,
-        firstName: state.user.firstName,
-        lastName: state.user.lastName,
-        type: 'ot',
-        timeIn,
-        timeOut,
-        note: note || 'ปฏิบัติงานล่วงเวลา (OT)',
-        mood: editingMood,
-        photo: currentPhoto,
-        checkoutTime: currentCheckoutTime,
-        checkoutLocation: currentCheckoutLocation,
-        updatedAt: Date.now()
-      };
-
-      const reqObj = {
-        id: `req-${empId}-${editingDateKey}-ot-${Date.now()}`,
-        firstName: state.user.firstName,
-        lastName: state.user.lastName,
-        empId,
-        approverId: APPROVER_ID,
-        type: 'ot',
-        from: editingDateKey,
-        to: editingDateKey,
-        timeIn,
-        timeOut,
-        hours,
-        note: note || 'ปฏิบัติงานล่วงเวลา (OT)',
-        mood: editingMood,
-        photo: currentPhoto,
-        checkoutTime: currentCheckoutTime,
-        checkoutLocation: currentCheckoutLocation,
-        updatedAt: Date.now(),
-        status: 'submitted'
-      };
-
-      allCloudCalendarItems = allCloudCalendarItems.filter(c => !((c.empId || '').toUpperCase() === empId && c.dateKey === editingDateKey));
-      allCloudCalendarItems.push(calItem);
-      state.teamRequests.unshift(reqObj);
-
-      window.persistLocalDatabase();
-      rebuildVisibleCalendarItems();
-      closeDaySheet();
-      renderApp();
-      showToast(`ส่งคำขอทำโอที +${hours} ชม. ไปที่ SM2080797 แล้ว`);
-
-      if (window.cloudStore) {
-        await window.cloudStore.saveAccount(registeredAccounts[empId]);
-        await window.cloudStore.saveCalendarItem(calItem);
-        await window.cloudStore.saveRequest(reqObj);
-      }
+      total = 4;
+      const okIn = isHHMM(draft.timeIn), okOut = isHHMM(draft.timeOut);
+      if (!okIn) missing.push('เวลาเริ่ม OT');
+      if (!okOut) missing.push('เวลาเลิก OT');
+      else if (okIn && calcHours(draft.timeIn, draft.timeOut) <= 0) missing.push('เวลาเลิกต้องหลังเวลาเริ่ม');
+      if (!(draft.note || '').trim()) missing.push('หมายเหตุ');
+      if (!currentPhoto) missing.push('รูปถ่าย');
     } else {
-      const from = document.getElementById('inpLeaveFrom')?.value || editingDateKey;
-      const to = document.getElementById('inpLeaveTo')?.value || from;
+      total = 2;
+      if (!draft.leaveFrom) missing.push('วันที่เริ่มลา');
+      if (!draft.leaveTo) missing.push('ถึงวันที่');
+      else if (draft.leaveFrom && draft.leaveTo < draft.leaveFrom) missing.push('วันสิ้นสุดต้องไม่ก่อนวันเริ่ม');
+    }
+    return { ok: missing.length === 0, missing, total, done: Math.max(0, total - missing.length) };
+  }
 
-      const calItem = {
-        dateKey: from,
-        to,
-        empId,
-        firstName: state.user.firstName,
-        lastName: state.user.lastName,
-        type: 'leave',
-        note: note || 'ลาพักร้อน',
-        mood: editingMood,
-        updatedAt: Date.now()
-      };
+  function refreshSaveState() {
+    const btn = document.getElementById('btnSaveEntry');
+    const pg = document.getElementById('entryProgress');
+    if (!btn) return;
+    const v = entryValidation();
+    btn.disabled = !v.ok || savingEntry;
+    if (pg) {
+      pg.textContent = v.ok ? 'กรอกครบแล้ว ✓ พร้อมส่งคำขอ' : `กรอกแล้ว ${v.done}/${v.total} · ยังขาด: ${v.missing.join(', ')}`;
+      pg.style.color = v.ok ? '#0d9488' : '#e11d48';
+    }
+  }
 
-      const reqObj = {
-        id: `req-${empId}-${from}-leave-${Date.now()}`,
-        firstName: state.user.firstName,
-        lastName: state.user.lastName,
-        empId,
-        approverId: APPROVER_ID,
-        type: 'leave',
-        from,
-        to,
-        hours: 0,
-        note: note || 'ลาพักร้อน',
-        mood: editingMood,
-        updatedAt: Date.now(),
-        status: 'submitted'
-      };
+  function dropPendingDuplicates(empId, type, from) {
+    const removed = state.teamRequests.filter(r => (r.empId || '').toUpperCase() === empId && r.type === type && r.from === from && r.status !== 'approved');
+    removed.forEach(r => {
+      deletedRequestIds.add(r.id);
+      if (window.cloudStore) window.cloudStore.deleteRequest(r.id);
+    });
+    state.teamRequests = state.teamRequests.filter(r => !removed.includes(r));
+  }
 
-      allCloudCalendarItems = allCloudCalendarItems.filter(c => !((c.empId || '').toUpperCase() === empId && c.dateKey === from));
+  async function saveCurrentEntry() {
+    if (!state.user || isManager() || savingEntry) return;
+    const empId = state.user.empId.trim().toUpperCase();
+    captureDraft();
+    const v = entryValidation();
+    if (!v.ok) { showToast('กรุณากรอกให้ครบ: ' + v.missing.join(', ')); refreshSaveState(); return; }
+
+    const isOt = editingType === 'ot';
+    const key = isOt ? editingDateKey : draft.leaveFrom;
+    const approved = state.teamRequests.find(r => (r.empId || '').toUpperCase() === empId && r.type === (isOt ? 'ot' : 'leave') && r.from === key && r.status === 'approved');
+    if (approved) { showToast('วันนี้ได้รับอนุมัติแล้ว แก้ไขหรือส่งซ้ำไม่ได้'); return; }
+
+    savingEntry = true;
+    refreshSaveState();
+    try {
+      if (!registeredAccounts[empId] && !deletedAccountIds.has(empId)) {
+        registeredAccounts[empId] = {
+          empId,
+          firstName: state.user.firstName || `พนักงาน ${empId}`,
+          lastName: state.user.lastName || '',
+          pwHash: state.user.pwHash || '',
+          mood: state.user.mood || 'happy',
+          avatarPhoto: state.user.avatarPhoto || '',
+          updatedAt: Date.now()
+        };
+      }
+      const rid = (t) => `req-${empId}-${key}-${t}-${Date.now()}`;
+      let calItem, reqObj, msg;
+
+      if (isOt) {
+        const timeIn = draft.timeIn, timeOut = draft.timeOut, note = draft.note.trim();
+        const hours = calcHours(timeIn, timeOut);
+        calItem = {
+          dateKey: editingDateKey, empId, firstName: state.user.firstName, lastName: state.user.lastName,
+          type: 'ot', timeIn, timeOut, note, mood: editingMood, photo: currentPhoto,
+          checkoutTime: currentCheckoutTime, checkoutLocation: currentCheckoutLocation, updatedAt: Date.now()
+        };
+        reqObj = {
+          id: rid('ot'), firstName: state.user.firstName, lastName: state.user.lastName, empId, approverId: APPROVER_ID,
+          type: 'ot', from: editingDateKey, to: editingDateKey, timeIn, timeOut, hours, note, mood: editingMood,
+          photo: currentPhoto, checkoutTime: currentCheckoutTime, checkoutLocation: currentCheckoutLocation,
+          updatedAt: Date.now(), status: 'submitted'
+        };
+        dropPendingDuplicates(empId, 'ot', editingDateKey);
+        msg = `ส่งคำขอทำโอที +${hours} ชม. ไปที่ SM2080797 แล้ว`;
+      } else {
+        const from = draft.leaveFrom, to = draft.leaveTo, note = (draft.note || '').trim() || 'ลาพักร้อน';
+        const prev = state.items[editingDateKey];
+        if (prev && prev.type === 'leave' && from !== editingDateKey) {
+          dropPendingDuplicates(empId, 'leave', editingDateKey);
+          allCloudCalendarItems = allCloudCalendarItems.filter(c => !((c.empId || '').toUpperCase() === empId && c.dateKey === editingDateKey));
+          if (window.cloudStore) window.cloudStore.deleteCalendarItem(empId, editingDateKey);
+        }
+        calItem = {
+          dateKey: from, to, empId, firstName: state.user.firstName, lastName: state.user.lastName,
+          type: 'leave', note, mood: editingMood, updatedAt: Date.now()
+        };
+        reqObj = {
+          id: rid('leave'), firstName: state.user.firstName, lastName: state.user.lastName, empId, approverId: APPROVER_ID,
+          type: 'leave', from, to, hours: 0, note, mood: editingMood, updatedAt: Date.now(), status: 'submitted'
+        };
+        dropPendingDuplicates(empId, 'leave', from);
+        msg = `ส่งคำขอลาพักร้อน (${formatThaiShort(from)} – ${formatThaiShort(to)}) ไปที่ SM2080797 แล้ว`;
+      }
+
+      allCloudCalendarItems = allCloudCalendarItems.filter(c => !((c.empId || '').toUpperCase() === empId && c.dateKey === calItem.dateKey));
       allCloudCalendarItems.push(calItem);
       state.teamRequests.unshift(reqObj);
 
@@ -2298,13 +2544,17 @@ window.cloudStore = {
       rebuildVisibleCalendarItems();
       closeDaySheet();
       renderApp();
-      showToast(`ส่งคำขอลาพักร้อน (${formatThaiShort(from)} – ${formatThaiShort(to)}) ไปที่ SM2080797 แล้ว`);
+      showToast(msg);
 
       if (window.cloudStore) {
-        await window.cloudStore.saveAccount(registeredAccounts[empId]);
-        await window.cloudStore.saveCalendarItem(calItem);
-        await window.cloudStore.saveRequest(reqObj);
+        await Promise.all([
+          window.cloudStore.saveAccount(registeredAccounts[empId]),
+          window.cloudStore.saveCalendarItem(calItem),
+          window.cloudStore.saveRequest(reqObj)
+        ]);
       }
+    } finally {
+      savingEntry = false;
     }
   }
 
