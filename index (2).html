@@ -1,0 +1,3535 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#1e1b4b" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="oto" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link id="dynamicManifestLink" rel="manifest" />
+  <link id="appleTouchIconLink" rel="apple-touch-icon" />
+  <title>oto — ปฏิทินโอที & ลาพักร้อน</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600;700&family=Fredoka:wght@600;700&family=Kanit:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #1e1b4b;
+      --paper: #f6f5ff;
+      --card: #ffffff;
+      --peach: #ffb98a;
+      --lavender: #e5e2ff;
+      --mint: #c6f3dc;
+      --sky: #d9f0ff;
+      --rose: #ffd6e0;
+      --muted: #7a76a3;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    input, textarea, select {
+      user-select: text !important;
+      -webkit-user-select: text !important;
+      pointer-events: auto !important;
+      touch-action: manipulation;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      min-height: 100vh;
+      font-family: 'Anuphan', sans-serif;
+      background: #e9e6fb;
+      color: var(--ink);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 16px 12px;
+      overflow-x: hidden;
+    }
+
+    @media (max-width: 640px) {
+      html, body {
+        padding: 0;
+        background: var(--ink);
+        align-items: stretch;
+      }
+      .phone-shell {
+        width: 100vw !important;
+        min-width: 100vw !important;
+        max-width: 100vw !important;
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+        border-radius: 0 !important;
+        border: none !important;
+        box-shadow: none !important;
+      }
+      .bottom-nav {
+        padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+      }
+      .sheet-card {
+        max-height: 92dvh !important;
+        padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)) !important;
+      }
+    }
+
+    h1, h2, h3, .font-heading {
+      font-family: 'Kanit', sans-serif;
+    }
+
+    .font-brand {
+      font-family: 'Fredoka', sans-serif;
+    }
+
+    .phone-shell {
+      width: 412px;
+      min-width: 360px;
+      max-width: 100%;
+      height: 830px;
+      max-height: 94vh;
+      margin: 0 auto;
+      flex-shrink: 0;
+      background: var(--paper);
+      border-radius: 44px;
+      border: 4px solid var(--ink);
+      box-shadow: 0 24px 54px rgba(30, 27, 75, 0.22);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .top-header {
+      background: #ffffff;
+      padding: 16px 20px 26px;
+      position: relative;
+      z-index: 10;
+    }
+
+    .wave-divider {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -1px;
+      width: 100%;
+      height: 22px;
+      display: block;
+    }
+
+    .main-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px 104px;
+      scrollbar-width: none;
+    }
+    .main-scroll::-webkit-scrollbar {
+      display: none;
+    }
+
+    .comic-card {
+      background: #ffffff;
+      border: 2.5px solid var(--ink);
+      border-radius: 26px;
+      box-shadow: 0 5px 0 var(--ink);
+    }
+
+    .comic-pill {
+      border: 2px solid var(--ink);
+      border-radius: 9999px;
+      font-weight: 600;
+      transition: transform 0.12s ease, background 0.15s ease;
+    }
+    .comic-pill:active {
+      transform: scale(0.96);
+    }
+
+    .comic-input {
+      width: 100%;
+      background: #ffffff !important;
+      color: var(--ink) !important;
+      border: 2.5px solid var(--ink);
+      border-radius: 16px;
+      padding: 11px 14px;
+      font-family: 'Anuphan', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      outline: none;
+      cursor: text;
+      -webkit-appearance: none;
+      appearance: none;
+      transition: box-shadow 0.15s ease, transform 0.12s ease;
+    }
+    .comic-input::placeholder {
+      color: #9e9bc2;
+      font-weight: 400;
+    }
+    .comic-input:focus {
+      box-shadow: 0 3px 0 var(--ink);
+      background: #fffdfb !important;
+    }
+
+    .comic-btn {
+      border: 2.5px solid var(--ink);
+      border-radius: 9999px;
+      font-family: 'Kanit', sans-serif;
+      font-weight: 600;
+      box-shadow: 0 3px 0 var(--ink);
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
+      cursor: pointer;
+    }
+    .comic-btn:active {
+      transform: translateY(2px);
+      box-shadow: 0 1px 0 var(--ink);
+    }
+    .comic-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
+
+    .day-cell {
+      aspect-ratio: 1 / 1.16;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 2px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: transform 0.12s ease, border-color 0.15s ease;
+      position: relative;
+      background: #f4f3ff;
+    }
+    .day-cell:hover {
+      border-color: rgba(30, 27, 75, 0.25);
+    }
+    .day-cell:active {
+      transform: scale(0.93);
+    }
+    .day-cell.other-month {
+      opacity: 0.32;
+      background: transparent;
+    }
+    .day-cell.is-today {
+      border: 2.5px solid var(--ink);
+      background: #ffffff;
+    }
+    .day-cell.has-ot {
+      background: linear-gradient(180deg, #ffe6d3 0%, #ffd5ec 100%);
+      border: 2px solid var(--ink);
+    }
+    .day-cell.has-leave {
+      background: #0d9488;
+      border: 2px solid var(--ink);
+      color: #ffffff;
+    }
+    .day-cell.has-leave .day-num {
+      color: #ffffff !important;
+    }
+    .day-cell.has-leave .day-badge-leave {
+      background: #064e3b;
+      color: #ffffff;
+      border-color: #ffffff;
+    }
+
+    .bottom-nav {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #ffffff;
+      border-top: 2.5px solid var(--ink);
+      border-top-left-radius: 30px;
+      border-top-right-radius: 30px;
+      padding: 10px 14px 14px;
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      z-index: 25;
+      box-shadow: 0 -6px 20px rgba(30, 27, 75, 0.08);
+    }
+
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+      position: relative;
+      min-width: 62px;
+      transition: color 0.15s ease;
+    }
+    .nav-item.active {
+      color: var(--ink);
+    }
+    .nav-item.active .nav-icon-wrap {
+      background: #ffffff;
+      border: 2.5px solid var(--ink);
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: -22px;
+      box-shadow: 0 3px 0 var(--ink);
+    }
+    .nav-icon-wrap {
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .sheet-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(24, 21, 58, 0.55);
+      backdrop-filter: blur(2px);
+      z-index: 40;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .sheet-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .sheet-card {
+      background: #f6f5ff;
+      border-top: 3px solid var(--ink);
+      border-top-left-radius: 34px;
+      border-top-right-radius: 34px;
+      padding: 14px 18px 24px;
+      max-height: 88%;
+      overflow-y: auto;
+      transform: translateY(100%);
+      transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+      scrollbar-width: none;
+    }
+    .sheet-card::-webkit-scrollbar {
+      display: none;
+    }
+    .sheet-backdrop.open .sheet-card {
+      transform: translateY(0);
+    }
+
+    .login-overlay {
+      position: absolute;
+      inset: 0;
+      background: var(--ink);
+      z-index: 60;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      padding: 16px 20px 28px;
+      color: #ffffff;
+      overflow-y: auto;
+      scrollbar-width: none;
+    }
+    .login-overlay::-webkit-scrollbar {
+      display: none;
+    }
+    .login-overlay.hidden {
+      display: none;
+    }
+
+    .toast-pill {
+      position: absolute;
+      bottom: 92px;
+      left: 50%;
+      transform: translateX(-50%) translateY(16px);
+      background: #ffffff;
+      color: var(--ink);
+      border: 2.5px solid var(--ink);
+      border-radius: 9999px;
+      padding: 9px 18px;
+      font-size: 13px;
+      font-weight: 700;
+      box-shadow: 0 4px 0 var(--ink);
+      z-index: 70;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.22s ease;
+      max-width: 90%;
+      text-align: center;
+    }
+    .toast-pill.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+<div class="phone-shell" id="phoneShell">
+  <!-- Login Overlay -->
+  <div class="login-overlay" id="loginScreen">
+    <div class="flex flex-col items-center text-center mt-2">
+      <div class="w-16 h-16 rounded-full bg-white border-[3px] border-[#ffb98a] flex items-center justify-center mb-2 shadow-lg">
+        <svg width="38" height="38" viewBox="0 0 64 64" fill="none">
+          <circle cx="32" cy="34" r="24" fill="#FFE6D5" stroke="#1E1B4B" stroke-width="3.5"/>
+          <path d="M12 24C14 14 23 10 32 10C41 10 50 14 52 24C45 20 39 22 32 22C25 22 19 20 12 24Z" fill="#1E1B4B"/>
+          <circle cx="24" cy="34" r="2.8" fill="#1E1B4B"/>
+          <circle cx="40" cy="34" r="2.8" fill="#1E1B4B"/>
+          <path d="M26 42C28.5 45 35.5 45 38 42" stroke="#1E1B4B" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="18" cy="39" r="3" fill="#FF9EB5" opacity="0.75"/>
+          <circle cx="46" cy="39" r="3" fill="#FF9EB5" opacity="0.75"/>
+        </svg>
+      </div>
+      <div class="font-brand text-3xl tracking-tight text-white">oto</div>
+      <p class="text-xs text-[#c7c3ea] mt-0.5">บันทึกเวลาโอที & วันลาพักร้อนของทีม</p>
+    </div>
+
+    <div class="space-y-3 my-auto pt-3">
+      <div class="grid grid-cols-2 gap-2">
+        <button type="button" id="btnAuthLoginMode" onclick="setAuthMode('login')" class="comic-pill py-2 text-xs font-bold bg-[#ffb98a] text-[#1e1b4b] border-white">
+          🔑 เข้าสู่ระบบ
+        </button>
+        <button type="button" id="btnAuthRegisterMode" onclick="setAuthMode('register')" class="comic-pill py-2 text-xs font-bold bg-[#2c2866] text-white border-[#7a76a3]">
+          ✨ สร้างรหัสพนักงาน
+        </button>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-[#d8d5f7] mb-1">ใส่รหัสพนักงาน</label>
+        <input id="inpEmpId" type="text" oninput="onAuthEmpIdChange()" class="comic-input uppercase" placeholder="ใส่รหัสพนักงาน" value="" autocomplete="username" />
+      </div>
+
+      <div id="approverRecognizedBadge" class="hidden rounded-2xl bg-[#c6f3dc] text-[#1e1b4b] px-3 py-2 text-xs font-bold">
+        🛡️ ผู้อนุมัติหลัก: <span id="approverRecognizedName">นาย ณัฐวุฒิ ชุมหิรัญ</span> (ไม่ต้องกรอกชื่อ ใส่รหัสผ่านได้เลย)
+      </div>
+
+      <div id="nameFieldsGroup" class="grid grid-cols-2 gap-2.5 hidden">
+        <div>
+          <label class="block text-xs font-semibold text-[#d8d5f7] mb-1">ชื่อ</label>
+          <input id="inpFirst" type="text" class="comic-input" placeholder="เช่น กานต์พิชชา" value="" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-[#d8d5f7] mb-1">นามสกุล</label>
+          <input id="inpLast" type="text" class="comic-input" placeholder="เช่น สุขใจ" value="" />
+        </div>
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between mb-1">
+          <label id="lblPasswordField" class="block text-xs font-semibold text-[#d8d5f7]">รหัสผ่าน (Password)</label>
+          <button type="button" id="btnResetSmPass" onclick="resetSmPasswordPrompt()" class="hidden text-[11px] font-bold text-[#ffb98a] underline">
+            🔄 รีรหัสผ่าน SM
+          </button>
+        </div>
+        <input id="inpPassword" type="password" class="comic-input" placeholder="กรอกรหัสผ่านของคุณ" value="" autocomplete="current-password" />
+      </div>
+
+      <p id="authHelperNote" class="text-[11px] text-[#c7c3ea] leading-relaxed">
+        * ระบบจำรหัสพนักงานและซิงค์ข้อมูลข้ามเครื่อง (คอมฯ ↔ มือถือ) อัตโนมัติ
+      </p>
+
+      <div class="flex items-center justify-between gap-2 text-[11px] bg-[#262259] border border-[#4c4694] rounded-2xl px-3 py-2">
+        <span class="text-[#c7c3ea] shrink-0">☁️ ฐานข้อมูลกลาง:</span>
+        <span id="cloudSyncStatusText" class="text-[#36c78c] font-bold text-right">กำลังเชื่อมต่อฐานข้อมูลกลาง...</span>
+      </div>
+
+      <button type="button" id="btnAuthSubmit" onclick="handleLogin()" class="comic-btn w-full py-3.5 bg-[#ffb98a] text-[#1e1b4b] text-base mt-1">
+        เข้าใช้งานระบบ
+      </button>
+
+      <button type="button" id="btnInstallAppLogin" onclick="triggerAppInstall()" class="comic-pill w-full py-2.5 bg-[#2c2866] text-white border-[#7a76a3] text-xs font-bold flex items-center justify-center gap-1.5">
+        <span>📲 ติดตั้งแอป oto ลงเครื่อง (iOS / Android / คอมฯ)</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Top Header -->
+  <header class="top-header" id="appHeader"></header>
+
+  <!-- Main Content -->
+  <main class="main-scroll" id="appMain"></main>
+
+  <!-- Bottom Navigation -->
+  <nav class="bottom-nav" id="appNav"></nav>
+
+  <!-- Day Entry Bottom Sheet -->
+  <div class="sheet-backdrop" id="daySheet" onclick="if(event.target===this) closeDaySheet()">
+    <div class="sheet-card" id="daySheetContent"></div>
+  </div>
+
+  <!-- Approval Detail Sheet -->
+  <div class="sheet-backdrop" id="approvalSheet" onclick="if(event.target===this) closeApprovalDetail()">
+    <div class="sheet-card" id="approvalSheetContent"></div>
+  </div>
+
+  <!-- Photo Lightbox -->
+  <div class="sheet-backdrop" id="photoViewer" onclick="closePhotoViewer()" style="justify-content:center; padding:18px; z-index:65;">
+    <div class="comic-card p-3 bg-white max-w-full" onclick="event.stopPropagation()">
+      <img id="photoViewerImg" src="" class="w-full max-h-[65vh] object-contain rounded-2xl border-2 border-[#1e1b4b]" alt="หลักฐานเช็คเอาท์" />
+      <div id="photoViewerMeta" class="mt-2 px-2 py-1.5 rounded-xl bg-[#f6f5ff] border border-[#1e1b4b] text-xs font-bold text-[#1e1b4b]"></div>
+      <button type="button" onclick="closePhotoViewer()" class="comic-btn w-full py-2.5 bg-[#ffb98a] text-sm mt-2.5">ปิดรูปภาพ</button>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast-pill" id="toastPill"></div>
+</div>
+
+<!-- Firestore real-time cross-device sync (เลิกใช้ ntfy.sh) -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+import { getAuth, signInAnonymously, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDoc, getDocs, setDoc, deleteDoc, collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+// =====================================================================
+// ★ ตั้งค่าฐานข้อมูลกลาง (Firebase / Firestore) — วาง firebaseConfig ของโปรเจกต์ตัวเองตรงนี้ ★
+// ตัวอย่าง: { apiKey: "AIza...", authDomain: "xxx.firebaseapp.com", projectId: "xxx", appId: "1:123:web:abc" }
+// =====================================================================
+const EMBEDDED_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyChhnbQeF1z4_xPnjof7ggFiH0RrnpdXNQ",
+  authDomain: "ogtar-71b7e.firebaseapp.com",
+  projectId: "ogtar-71b7e",
+  storageBucket: "ogtar-71b7e.firebasestorage.app",
+  messagingSenderId: "984596630182",
+  appId: "1:984596630182:web:6e912209acb063a7dd8267"
+};
+
+const LS_CFG = 'oto_firebase_config_v10';
+const SEEN_KEY = 'oto_seen_v10';
+const $id = (x) => document.getElementById(x);
+const toast = (m) => { try { window.showToast && window.showToast(m); } catch (e) {} };
+const safeId = (s) => String(s || '').replace(/[\/\s]/g, '_');
+
+function parseCfgText(text) {
+  const t = String(text || '');
+  const a = t.indexOf('{'), b = t.lastIndexOf('}');
+  if (a < 0 || b < a) return null;
+  let body = t.slice(a, b + 1);
+  try { return JSON.parse(body); } catch (e) {}
+  try {
+    body = body.replace(/([{,]\s*)([A-Za-z0-9_]+)\s*:/g, '$1"$2":').replace(/,\s*}/g, '}').replace(/'/g, '"');
+    return JSON.parse(body);
+  } catch (e) { return null; }
+}
+
+function resolveConfig() {
+  if (EMBEDDED_FIREBASE_CONFIG && EMBEDDED_FIREBASE_CONFIG.projectId) return EMBEDDED_FIREBASE_CONFIG;
+  if (typeof __firebase_config !== 'undefined') { try { return JSON.parse(__firebase_config); } catch (e) {} }
+  try { const v = localStorage.getItem(LS_CFG); if (v) return JSON.parse(v); } catch (e) {}
+  return null;
+}
+
+const BASE = (typeof __app_id !== 'undefined') ? ['artifacts', __app_id, 'public', 'data'] : [];
+let db = null, cloudOn = false, pendingWrites = 0, lastError = '', smHash = '';
+const first = { accounts: false, requests: false, calendar: false, settings: false };
+const lastIds = { accounts: new Set(), requests: new Set(), calendar: new Set() };
+let seen = { accounts: [], requests: [], calendar: [] };
+try { seen = { ...seen, ...JSON.parse(localStorage.getItem(SEEN_KEY) || '{}') }; } catch (e) {}
+const persistSeen = () => { try { localStorage.setItem(SEEN_KEY, JSON.stringify(seen)); } catch (e) {} };
+const photoSig = new Map();
+const photoFail = new Map();
+
+// ---------- สถานะการเชื่อมต่อ (แสดงตามจริง ไม่หลอกว่าออนไลน์) ----------
+const BADGE = {
+  local:      ['⚠️ ยังไม่ได้ตั้งค่าฐานข้อมูลกลาง · ข้อมูลอยู่เฉพาะเครื่องนี้', '⚠️ ไม่มีฐานข้อมูลกลาง', 'warn'],
+  error:      ['⚠️ เชื่อมฐานข้อมูลไม่สำเร็จ (' + '${E}' + ') · ตรวจ Rules / Anonymous Auth', '⚠️ เชื่อมต่อผิดพลาด', 'warn'],
+  offline:    ['⚠️ ออฟไลน์ · จะส่งขึ้นระบบกลางอัตโนมัติเมื่อมีเน็ต', '⚠️ ออฟไลน์', 'warn'],
+  pending:    ['กำลังส่งข้อมูลขึ้นระบบกลาง…', '☁️ กำลังส่ง…', 'wait'],
+  connecting: ['กำลังเชื่อมต่อฐานข้อมูล…', '☁️ เชื่อมต่อ…', 'wait'],
+  online:     ['ออนไลน์ · ซิงค์ข้ามเครื่องแล้ว ✓', '☁️ ออนไลน์ ✓', 'ok']
+};
+function badgeKind() {
+  if (!cloudOn) return 'local';
+  if (lastError) return 'error';
+  if (!navigator.onLine) return 'offline';
+  if (pendingWrites > 0) return 'pending';
+  if (!(first.accounts && first.requests && first.calendar)) return 'connecting';
+  return 'online';
+}
+function applyBadge() {
+  const k = badgeKind(), b = BADGE[k];
+  const el = $id('cloudSyncStatusText');
+  if (el) {
+    el.textContent = b[0].replace('${E}', lastError);
+    el.className = b[2] === 'ok' ? 'text-[#36c78c] font-bold text-right' : 'text-[#ffb98a] font-bold text-right';
+  }
+  const hb = $id('headerCloudBadge');
+  if (hb) {
+    hb.textContent = b[1];
+    hb.className = 'text-[10px] px-2.5 py-0.5 rounded-full border border-[#1e1b4b] font-bold text-[#1e1b4b] ' +
+      (b[2] === 'ok' ? 'bg-[#c6f3dc]' : b[2] === 'wait' ? 'bg-[#fff1b8]' : 'bg-[#ffd6e0]');
+  }
+}
+setInterval(applyBadge, 1200);
+window.addEventListener('online', applyBadge);
+window.addEventListener('offline', applyBadge);
+
+// ---------- เขียนข้อมูล: ไม่บล็อก UI (คิวในเครื่อง + ส่งซ้ำอัตโนมัติเมื่อมีเน็ต) ----------
+function write(fn, ms = 4000) {
+  let p;
+  try { p = fn(); } catch (e) { return Promise.resolve(false); }
+  pendingWrites++; applyBadge();
+  const done = p.then(() => { lastError = ''; return true; })
+    .catch((e) => {
+      lastError = (e && e.code) || 'error';
+      if (e && e.code === 'permission-denied') toast('ฐานข้อมูลปฏิเสธการบันทึก (ตรวจ Firestore Rules / เปิด Anonymous Auth)');
+      return false;
+    })
+    .finally(() => { pendingWrites = Math.max(0, pendingWrites - 1); applyBadge(); });
+  return Promise.race([done, new Promise((r) => setTimeout(() => r(false), ms))]);
+}
+const put = (name, id, data) => db ? write(() => setDoc(doc(db, ...BASE, name, safeId(id)), data)) : Promise.resolve(false);
+const del = (name, id) => db ? write(() => deleteDoc(doc(db, ...BASE, name, safeId(id)))) : Promise.resolve(false);
+
+// ---------- บีบอัดรูป (รูปแยกเก็บคนละคอลเลกชัน ให้รายการเบาและเร็ว) ----------
+function shrink(dataUrl, maxLen = 130000, maxW = 720) {
+  if (!dataUrl || dataUrl.length <= maxLen) return Promise.resolve(dataUrl);
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let w = Math.min(img.width, maxW), q = 0.72, out = dataUrl;
+      for (let i = 0; i < 7; i++) {
+        const c = document.createElement('canvas');
+        c.width = w; c.height = Math.max(1, Math.round(img.height * w / img.width));
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        out = c.toDataURL('image/jpeg', q);
+        if (out.length <= maxLen) break;
+        q = Math.max(0.4, q - 0.08); w = Math.round(w * 0.85);
+      }
+      resolve(out);
+    };
+    img.onerror = () => resolve('');
+    img.src = dataUrl;
+  });
+}
+async function savePhoto(kind, id, dataUrl) {
+  if (!db || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) return false;
+  const key = kind + '_' + id;
+  const sig = dataUrl.length + ':' + dataUrl.slice(-48);
+  if (photoSig.get(key) === sig) return true;
+  const small = await shrink(dataUrl);
+  if (!small) return false;
+  photoSig.set(key, sig);
+  return put('oto_photos', key, { data: small, updatedAt: Date.now() });
+}
+
+// ---------- ฟังข้อมูลจากฐานข้อมูลแบบเรียลไทม์ ----------
+function applyDelete(kind, id) {
+  try {
+    if (kind === 'accounts') {
+      window.applyLiveEvent({ action: 'delete_account', data: { empId: id } });
+      const u = window.getCurrentUserInfo && window.getCurrentUserInfo();
+      if (u && !u.manager && u.empId.toUpperCase() === String(id).toUpperCase()) {
+        toast('บัญชีนี้ถูกลบออกจากระบบแล้ว'); window.logoutUser && window.logoutUser();
+      }
+    } else if (kind === 'requests') {
+      window.applyLiveEvent({ action: 'delete_request', data: { id } });
+    } else {
+      const i = id.lastIndexOf('_');
+      window.applyLiveEvent({ action: 'delete_calendar', data: { empId: id.slice(0, i), dateKey: id.slice(i + 1) } });
+    }
+  } catch (e) {}
+}
+
+let uploading = false;
+async function uploadLocalOnly(kind) {
+  if (uploading || !db || !window.getAppSyncSnapshot) return;
+  const u = window.getCurrentUserInfo && window.getCurrentUserInfo();
+  if (!u || !u.empId) return;
+  const me = u.empId.toUpperCase();
+  const mine = (e) => u.manager || String(e || '').toUpperCase() === me;
+  const snap = window.getAppSyncSnapshot(), tomb = snap.tombstones || {}, cloud = lastIds[kind];
+  const jobs = [];
+  if (kind === 'accounts') {
+    Object.entries(snap.accounts || {}).forEach(([k, a]) => {
+      if (!a) return;
+      const id = String(a.empId || k).toUpperCase();
+      if (cloud.has(safeId(id)) || (tomb.accounts || []).includes(id) || !mine(id)) return;
+      jobs.push(() => window.cloudStore.saveAccount(a));
+    });
+  } else if (kind === 'requests') {
+    (snap.requests || []).forEach((r) => {
+      if (!r || !r.id || cloud.has(safeId(r.id)) || (tomb.requests || []).includes(r.id) || !mine(r.empId)) return;
+      jobs.push(() => window.cloudStore.saveRequest(r));
+    });
+  } else {
+    (snap.calendar || []).forEach((c) => {
+      if (!c || !c.dateKey) return;
+      const emp = String(c.empId || '').toUpperCase(), key = emp + '_' + c.dateKey;
+      if (cloud.has(safeId(key)) || (tomb.calendar || []).includes(key) || !mine(emp)) return;
+      jobs.push(() => window.cloudStore.saveCalendarItem(c));
+    });
+  }
+  if (!jobs.length) return;
+  uploading = true;
+  try { for (const j of jobs.slice(0, 60)) await j(); } finally { uploading = false; }
+  try { window.persistLocalDatabase && window.persistLocalDatabase(); } catch (e) {}
+}
+
+let photoTimer = null;
+function schedulePhotos() { clearTimeout(photoTimer); photoTimer = setTimeout(loadPhotos, 400); }
+async function loadPhotos() {
+  if (!db || !window.getAppSyncSnapshot) return;
+  const u = window.getCurrentUserInfo && window.getCurrentUserInfo();
+  if (!u || !u.empId) return;
+  const me = u.empId.toUpperCase(), snap = window.getAppSyncSnapshot();
+  const ok = (e) => u.manager || String(e || '').toUpperCase() === me;
+  const need = [];
+  (snap.requests || []).slice(0, 60).forEach((r) => { if (r && r.hasPhoto && !r.photo && ok(r.empId)) need.push(['req', r.id, r]); });
+  (snap.calendar || []).slice(0, 120).forEach((c) => {
+    if (c && c.hasPhoto && !c.photo && ok(c.empId)) need.push(['cal', String(c.empId || '').toUpperCase() + '_' + c.dateKey, c]);
+  });
+  let changed = false, idx = 0;
+  const worker = async () => {
+    while (idx < need.length) {
+      const [kind, id, obj] = need[idx++];
+      const key = safeId(kind + '_' + id);
+      if ((photoFail.get(key) || 0) > Date.now()) continue;
+      try {
+        const s = await getDoc(doc(db, ...BASE, 'oto_photos', key));
+        if (s.exists() && s.data().data) {
+          obj.photo = s.data().data; changed = true;
+          photoSig.set(kind + '_' + id, obj.photo.length + ':' + obj.photo.slice(-48));
+        } else { photoFail.set(key, Date.now() + 60000); }
+      } catch (e) { photoFail.set(key, Date.now() + 30000); }
+    }
+  };
+  await Promise.all([worker(), worker(), worker()]);
+  if (changed) {
+    try { window.rebuildVisibleCalendarItems && window.rebuildVisibleCalendarItems(); window.renderApp && window.renderApp(); } catch (e) {}
+  }
+}
+
+function listen(name, kind, applyList) {
+  onSnapshot(collection(db, ...BASE, name), { includeMetadataChanges: true }, (snap) => {
+    lastError = '';
+    const list = [], ids = new Set();
+    snap.forEach((d) => { list.push(d.data()); ids.add(d.id); });
+    const server = !snap.metadata.fromCache;
+    if (server) {
+      const prev = seen[kind] || [];
+      const suspicious = ids.size === 0 && prev.length > 2; // กันกรณีฐานข้อมูลว่างผิดปกติ ไม่ให้ลบข้อมูลในเครื่องทิ้งทั้งหมด
+      if (!suspicious) {
+        prev.filter((id) => !ids.has(id)).forEach((id) => applyDelete(kind, id));
+        seen[kind] = Array.from(ids); persistSeen();
+      }
+      lastIds[kind] = ids; first[kind] = true;
+    }
+    try { applyList(list); } catch (e) {}
+    if (server) uploadLocalOnly(kind);
+    if (kind !== 'accounts') schedulePhotos();
+    applyBadge();
+  }, (err) => {
+    lastError = (err && err.code) || 'error'; applyBadge();
+    if (err && err.code === 'permission-denied') toast('ฐานข้อมูลปฏิเสธการอ่าน (ตรวจ Firestore Rules / เปิด Anonymous Auth)');
+  });
+}
+
+function waitFirst(keys, ms) {
+  return new Promise((res) => {
+    if (!db || !navigator.onLine) return res();
+    const t0 = Date.now();
+    const iv = setInterval(() => {
+      if (keys.every((k) => first[k]) || Date.now() - t0 > ms) { clearInterval(iv); res(); }
+    }, 100);
+  });
+}
+
+// ---------- API เดิมของแอป (คงชื่อไว้ เพื่อไม่ต้องแก้โค้ดส่วนอื่น) ----------
+window.cloudStore = {
+  isReady: () => cloudOn,
+  getCloudUrl: () => '',
+  settingsReady: () => !cloudOn || first.settings || !navigator.onLine,
+  getSmHash: () => smHash,
+  setSmHash: (h) => put('oto_settings', 'sm', { pwHash: h, updatedAt: Date.now() }),
+  buildLocalSnapshot: () => (window.getAppSyncSnapshot ? window.getAppSyncSnapshot() : {}),
+  emitLiveEvent: async () => true,
+  setCustomCloudUrl: async (val) => {
+    const v = String(val || '').trim();
+    if (!v) { try { localStorage.removeItem(LS_CFG); } catch (e) {} }
+    else {
+      const j = parseCfgText(v);
+      if (!j || !j.apiKey || !j.projectId) { toast('Firebase config ไม่ถูกต้อง (ต้องมี apiKey และ projectId)'); return false; }
+      try { localStorage.setItem(LS_CFG, JSON.stringify(j)); } catch (e) {}
+    }
+    toast('บันทึกแล้ว กำลังโหลดใหม่…'); setTimeout(() => location.reload(), 900); return true;
+  },
+  pushFullSnapshot: async () => { ['accounts', 'requests', 'calendar'].forEach((k) => uploadLocalOnly(k)); return true; },
+  pullFromCloud: async (showNote = false) => {
+    if (!db) { if (showNote) toast('ยังไม่ได้ตั้งค่าฐานข้อมูลกลาง (ข้อมูลอยู่เฉพาะเครื่องนี้)'); return false; }
+    await waitFirst(['accounts', 'settings'], 6000);
+    ['accounts', 'requests', 'calendar'].forEach((k) => uploadLocalOnly(k));
+    schedulePhotos();
+    if (showNote) toast(navigator.onLine ? '☁️ ซิงค์ข้อมูลล่าสุดเรียบร้อยแล้ว' : '⚠️ ออฟไลน์ · ใช้ข้อมูลล่าสุดในเครื่อง');
+    return true;
+  },
+  fetchAccount: async (empId) => {
+    if (!db || !empId) return null;
+    try {
+      const id = String(empId).toUpperCase();
+      const s = await getDoc(doc(db, ...BASE, 'oto_accounts', safeId(id)));
+      if (!s.exists()) return null;
+      window.applyLiveEvent({ action: 'upsert_account', data: s.data() });
+      return (window.getAppSyncSnapshot().accounts || {})[id] || s.data();
+    } catch (e) { return null; }
+  },
+  saveAccount: async (acc) => {
+    if (!acc || !acc.empId || !db) return false;
+    const id = String(acc.empId).toUpperCase();
+    if (!acc.pwHash && acc.password && window.otoHash) acc.pwHash = await window.otoHash(id, acc.password);
+    delete acc.password;
+    const a = { ...acc, empId: id };
+    if (a.avatarPhoto && a.avatarPhoto.length > 40000) a.avatarPhoto = await shrink(a.avatarPhoto, 40000, 256);
+    return put('oto_accounts', id, { ...a, updatedAt: a.updatedAt || Date.now() });
+  },
+  deleteAccount: async (empId) => {
+    if (!db || !empId) return false;
+    const id = String(empId).toUpperCase();
+    const ok = await del('oto_accounts', id);
+    try {
+      for (const [name, kind] of [['oto_requests', 'req'], ['oto_calendar', 'cal']]) {
+        const qs = await getDocs(query(collection(db, ...BASE, name), where('empId', '==', id)));
+        qs.forEach((d) => {
+          deleteDoc(d.ref).catch(() => {});
+          deleteDoc(doc(db, ...BASE, 'oto_photos', safeId(kind + '_' + d.id))).catch(() => {});
+        });
+      }
+    } catch (e) {}
+    return ok;
+  },
+  saveRequest: async (req) => {
+    if (!req || !req.id || !db) return false;
+    const { photo, ...rest } = req;
+    const hasPhoto = Boolean(photo) || Boolean(req.hasPhoto);
+    if (photo) await savePhoto('req', req.id, photo);
+    return put('oto_requests', req.id, { ...rest, photo: '', hasPhoto, updatedAt: req.updatedAt || Date.now() });
+  },
+  deleteRequest: async (reqId) => {
+    if (!reqId || !db) return false;
+    del('oto_photos', 'req_' + reqId);
+    return del('oto_requests', reqId);
+  },
+  saveCalendarItem: async (item) => {
+    if (!item || !item.dateKey || !db) return false;
+    const docId = (item.empId || 'EMP').toUpperCase() + '_' + item.dateKey;
+    const { photo, ...rest } = item;
+    const hasPhoto = Boolean(photo) || Boolean(item.hasPhoto);
+    if (photo) await savePhoto('cal', docId, photo);
+    return put('oto_calendar', docId, { ...rest, docId, photo: '', hasPhoto, updatedAt: item.updatedAt || Date.now() });
+  },
+  deleteCalendarItem: async (empId, dateKey) => {
+    if (!dateKey || !db) return false;
+    const docId = (empId || 'EMP').toUpperCase() + '_' + dateKey;
+    del('oto_photos', 'cal_' + docId);
+    return del('oto_calendar', docId);
+  }
+};
+
+// ---------- เริ่มทำงาน ----------
+(async function init() {
+  const cfg = resolveConfig();
+  window.__otoCloudOn = false;
+  if (!cfg) { applyBadge(); return; }
+  if (seen.pid !== cfg.projectId) { seen = { accounts: [], requests: [], calendar: [], pid: cfg.projectId }; persistSeen(); }
+  try {
+    const app = initializeApp(cfg);
+    try {
+      db = initializeFirestore(app, {
+        localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+        experimentalAutoDetectLongPolling: true,
+        ignoreUndefinedProperties: true
+      });
+    } catch (e) { db = getFirestore(app); }
+    cloudOn = true; window.__otoCloudOn = true; applyBadge();
+    try {
+      const auth = getAuth(app);
+      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token);
+      else await signInAnonymously(auth);
+    } catch (e) {
+      toast('เปิด Anonymous Authentication ใน Firebase ก่อน (Authentication → Sign-in method)');
+    }
+    listen('oto_accounts', 'accounts', (list) => {
+      const map = {};
+      list.forEach((a) => { if (a && a.empId) map[String(a.empId).toUpperCase()] = a; });
+      window.syncAccountsFromCloud(list);
+    });
+    listen('oto_requests', 'requests', (list) => { window.syncRequestsFromCloud(list); if (window.dedupeRequests) window.dedupeRequests(); });
+    setInterval(() => { if (window.dedupeRequests) window.dedupeRequests(); }, 8000);
+    listen('oto_calendar', 'calendar', (list) => window.syncCalendarFromCloud(list));
+    onSnapshot(doc(db, ...BASE, 'oto_settings', 'sm'), { includeMetadataChanges: true }, (s) => {
+      smHash = (s.exists() && s.data().pwHash) || '';
+      if (!s.metadata.fromCache) first.settings = true;
+    }, () => { first.settings = true; });
+  } catch (err) {
+    lastError = 'init'; applyBadge();
+  }
+})();
+</script>
+
+<script>
+  // =========================================================================
+  // Application State & Thai Calendar / Cosmic Icons / Moods
+  // =========================================================================
+  const THAI_MONTHS = [
+    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+    'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+  ];
+  const THAI_MONTHS_SHORT = [
+    'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+    'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+  ];
+  const THAI_DAYS_SHORT = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+  const THAI_DAYS_FULL = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
+
+  const APPROVER_ID = 'SM2080797';
+  const APPROVER_NAME = 'นาย ณัฐวุฒิ ชุมหิรัญ';
+  const DEFAULT_APPROVER_PASS = ''; // เลิกเก็บรหัสผ่านตัวอักษรตรง ๆ ในโค้ด
+  const DEFAULT_SM_HASH = '6b0edaa8d206fbf22d3da5e5ffdff5291d14d5a86f403794f27dcda87441958c';
+  function sha256Hex(msg) {
+    const b = Array.from(new TextEncoder().encode(msg)), bitLen = b.length * 8;
+    b.push(0x80);
+    while (b.length % 64 !== 56) b.push(0);
+    for (let i = 7; i >= 0; i--) b.push(i > 3 ? 0 : (bitLen >>> (i * 8)) & 255);
+    const K = [], H = [];
+    const isPrime = (n) => { for (let d = 2; d * d <= n; d++) if (n % d === 0) return false; return true; };
+    for (let n = 2; K.length < 64; n++) {
+      if (!isPrime(n)) continue;
+      K.push(((Math.cbrt(n) % 1) * 4294967296) >>> 0);
+      if (H.length < 8) H.push(((Math.sqrt(n) % 1) * 4294967296) >>> 0);
+    }
+    const rr = (x, n) => (x >>> n) | (x << (32 - n));
+    for (let o = 0; o < b.length; o += 64) {
+      const w = new Array(64);
+      for (let i = 0; i < 16; i++) w[i] = (b[o + i * 4] << 24) | (b[o + i * 4 + 1] << 16) | (b[o + i * 4 + 2] << 8) | b[o + i * 4 + 3];
+      for (let i = 16; i < 64; i++) {
+        const s0 = rr(w[i - 15], 7) ^ rr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+        const s1 = rr(w[i - 2], 17) ^ rr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+        w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
+      }
+      let [a, bb, c, d, e, f, g, h] = H;
+      for (let i = 0; i < 64; i++) {
+        const S1 = rr(e, 6) ^ rr(e, 11) ^ rr(e, 25), ch = (e & f) ^ (~e & g), t1 = (h + S1 + ch + K[i] + w[i]) | 0;
+        const S0 = rr(a, 2) ^ rr(a, 13) ^ rr(a, 22), mj = (a & bb) ^ (a & c) ^ (bb & c), t2 = (S0 + mj) | 0;
+        h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = bb; bb = a; a = (t1 + t2) | 0;
+      }
+      H[0] = (H[0] + a) | 0; H[1] = (H[1] + bb) | 0; H[2] = (H[2] + c) | 0; H[3] = (H[3] + d) | 0;
+      H[4] = (H[4] + e) | 0; H[5] = (H[5] + f) | 0; H[6] = (H[6] + g) | 0; H[7] = (H[7] + h) | 0;
+    }
+    return H.map((x) => (x >>> 0).toString(16).padStart(8, '0')).join('');
+  }
+  async function otoHash(empId, pw) {
+    const msg = 'oto:' + String(empId || '').trim().toUpperCase() + ':' + String(pw);
+    try {
+      if (window.crypto && crypto.subtle) {
+        const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
+        return Array.from(new Uint8Array(h)).map((x) => x.toString(16).padStart(2, '0')).join('');
+      }
+    } catch (e) {}
+    return sha256Hex(msg);
+  }
+  window.otoHash = otoHash;
+
+
+  const MOODS = [
+    { id: 'happy', label: 'สดใส', bg: '#FFE6D5', mouth: 'M24 38C27 42 37 42 40 38', blush: true },
+    { id: 'calm', label: 'ชิลล์', bg: '#D9F0FF', mouth: 'M25 39H39', blush: true },
+    { id: 'proud', label: 'ภูมิใจ', bg: '#C6F3DC', mouth: 'M23 36C26 43 38 43 41 36Z', blush: true },
+    { id: 'tired', label: 'ล้าหน่อย', bg: '#E5E2FF', mouth: 'M25 41C28 38 36 38 39 41', blush: false },
+    { id: 'fire', label: 'ลุยเต็มที่', bg: '#FFD6E0', mouth: 'M24 37C28 41 36 41 40 37', blush: true }
+  ];
+
+  const COSMIC_ICONS = [
+    { id: 'planet', label: 'ดาวเสาร์', svg: '<circle cx="16" cy="16" r="7" fill="#FFB98A"/><ellipse cx="16" cy="16" rx="13" ry="4" transform="rotate(-22 16 16)" stroke="#ffffff" stroke-width="2" fill="none"/>' },
+    { id: 'moon', label: 'พระจันทร์', svg: '<path d="M19 7C13.5 7 9 11.5 9 17C9 22.5 13.5 27 19 27C21.5 27 23.8 26.1 25.5 24.5C20.5 24.5 16.5 20.5 16.5 15.5C16.5 11.8 18.7 8.6 21.8 7.3C20.9 7.1 20 7 19 7Z" fill="#FFE082"/>' },
+    { id: 'star', label: 'ดาววิ้ง', svg: '<polygon points="16,5 19.2,12.2 27,13 21.2,18.2 22.9,26 16,21.9 9.1,26 10.8,18.2 5,13 12.8,12.2" fill="#E5E2FF"/>' },
+    { id: 'rocket', label: 'จรวด', svg: '<path d="M16 5C20 9 22 14 22 20H10C10 14 12 9 16 5Z" fill="#FF9EB5"/><circle cx="16" cy="14" r="2.5" fill="#1E1B4B"/><path d="M10 18L6 23H10V18ZM22 18L26 23H22V18Z" fill="#80DEEA"/>' },
+    { id: 'cat', label: 'แมวอวกาศ', svg: '<circle cx="16" cy="18" r="8" fill="#D9F0FF"/><polygon points="9,13 11,6 15,11" fill="#D9F0FF"/><polygon points="23,13 21,6 17,11" fill="#D9F0FF"/><circle cx="13.5" cy="17" r="1.4" fill="#1E1B4B"/><circle cx="18.5" cy="17" r="1.4" fill="#1E1B4B"/>' }
+  ];
+
+  function renderMoodSvg(moodId, size = 34, avatarPhoto = '') {
+    if (avatarPhoto && typeof avatarPhoto === 'string' && avatarPhoto.startsWith('data:image')) {
+      return `<img src="${avatarPhoto}" alt="profile" style="width:${size}px;height:${size}px;" class="rounded-full object-cover border-2 border-[#1e1b4b] shrink-0 bg-white" />`;
+    }
+    const m = MOODS.find(x => x.id === moodId) || MOODS[0];
+    return `
+      <svg width="${size}" height="${size}" viewBox="0 0 64 64" fill="none" class="shrink-0">
+        <circle cx="32" cy="32" r="28" fill="${m.bg}" stroke="#1E1B4B" stroke-width="3.5"/>
+        <circle cx="23" cy="27" r="3" fill="#1E1B4B"/>
+        <circle cx="41" cy="27" r="3" fill="#1E1B4B"/>
+        ${m.blush ? '<circle cx="17" cy="33" r="3.2" fill="#FF9EB5" opacity="0.75"/><circle cx="47" cy="33" r="3.2" fill="#FF9EB5" opacity="0.75"/>' : ''}
+        <path d="${m.mouth}" stroke="#1E1B4B" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+    `;
+  }
+
+  function renderCosmicSvg(iconId, size = 20) {
+    const ic = COSMIC_ICONS.find(x => x.id === iconId) || COSMIC_ICONS[0];
+    return `<svg width="${size}" height="${size}" viewBox="0 0 32 32" fill="none">${ic.svg}</svg>`;
+  }
+
+  // =========================================================================
+  // Local Storage & Sync State Management
+  // =========================================================================
+  const LS_KEYS = {
+    accounts: 'oto_accounts_v9',
+    requests: 'oto_requests_v9',
+    calendar: 'oto_calendar_v9',
+    tombstones: 'oto_tombstones_v9',
+    session: 'oto_session_v9',
+    smPass: 'oto_sm_pass_v9'
+  };
+
+  function safeJsonParse(str, fallback) {
+    try {
+      const v = JSON.parse(str);
+      return v !== null && v !== undefined ? v : fallback;
+    } catch (e) {
+      return fallback;
+    }
+  }
+
+  let registeredAccounts = safeJsonParse(localStorage.getItem(LS_KEYS.accounts), {});
+  let allCloudCalendarItems = safeJsonParse(localStorage.getItem(LS_KEYS.calendar), []);
+  const savedTombstones = safeJsonParse(localStorage.getItem(LS_KEYS.tombstones), { accounts: [], requests: [], calendar: [] });
+  let deletedAccountIds = new Set(savedTombstones.accounts || []);
+  let deletedRequestIds = new Set(savedTombstones.requests || []);
+  let deletedCalendarKeys = new Set(savedTombstones.calendar || []);
+
+  const state = {
+    user: safeJsonParse(localStorage.getItem(LS_KEYS.session), null),
+    activeTab: 'cal',
+    approvalSubTab: 'pending',
+    viewYear: 2026,
+    viewMonth: 10,
+    items: {},
+    teamRequests: safeJsonParse(localStorage.getItem(LS_KEYS.requests), []),
+    iconSeed: 0,
+    confirmDeleteEmpId: null
+  };
+
+  (function initCurrentThaiDate() {
+    const now = new Date();
+    if (now.getFullYear() >= 2025) {
+      state.viewYear = now.getFullYear();
+      state.viewMonth = now.getMonth();
+    }
+  })();
+
+  function isManager() {
+    return (state.user?.empId || '').trim().toUpperCase() === APPROVER_ID;
+  }
+
+  window.getCurrentUserInfo = function () {
+    return { empId: (state.user && state.user.empId) || '', manager: isManager() };
+  };
+  window.renderApp = renderApp;
+  window.logoutUser = logoutUser;
+  window.rebuildVisibleCalendarItems = rebuildVisibleCalendarItems;
+  window.dedupeRequests = function () {
+    if (!state.user || !isManager()) return false;
+    const groups = new Map();
+    state.teamRequests.forEach(r => {
+      if (r.status !== 'submitted') return;
+      const k = `${(r.empId || '').toUpperCase()}|${r.type}|${r.from}`;
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(r);
+    });
+    const drop = [];
+    groups.forEach(list => {
+      if (list.length < 2) return;
+      list.sort((a, b) => (Number(Boolean(b.photo || b.hasPhoto)) - Number(Boolean(a.photo || a.hasPhoto))) || ((b.updatedAt || 0) - (a.updatedAt || 0)));
+      drop.push(...list.slice(1));
+    });
+    if (!drop.length) return false;
+    drop.forEach(r => {
+      deletedRequestIds.add(r.id);
+      if (window.cloudStore) window.cloudStore.deleteRequest(r.id);
+    });
+    state.teamRequests = state.teamRequests.filter(r => !drop.includes(r));
+    window.persistLocalDatabase();
+    renderApp();
+    showToast(`ลบคำขอซ้ำออกให้ ${drop.length} รายการแล้ว`);
+    return true;
+  };
+
+  function getSmPassword() {
+    return localStorage.getItem(LS_KEYS.smPass) || '';
+  }
+
+  function ensureAccountFromMeta(empId, firstName, lastName, mood, avatarPhoto) {
+    const id = (empId || '').trim().toUpperCase();
+    if (!id || id === APPROVER_ID || deletedAccountIds.has(id)) return false;
+    const existing = registeredAccounts[id];
+    const cleanFirst = (firstName || '').trim();
+    const cleanLast = (lastName || '').trim();
+    if (!existing) {
+      registeredAccounts[id] = {
+        empId: id,
+        firstName: cleanFirst || `พนักงาน ${id}`,
+        lastName: cleanLast || '',
+        password: '',
+        mood: mood || 'happy',
+        avatarPhoto: avatarPhoto || '',
+        updatedAt: Date.now()
+      };
+      return true;
+    }
+    let updated = false;
+    if (cleanFirst && (!existing.firstName || existing.firstName.startsWith('พนักงาน '))) {
+      existing.firstName = cleanFirst;
+      updated = true;
+    }
+    if (cleanLast && !existing.lastName) {
+      existing.lastName = cleanLast;
+      updated = true;
+    }
+    if (avatarPhoto && !existing.avatarPhoto) {
+      existing.avatarPhoto = avatarPhoto;
+      updated = true;
+    }
+    return updated;
+  }
+
+  window.persistLocalDatabase = function () {
+    const cloudOn = Boolean(window.__otoCloudOn);
+    const rep = (k, v) => {
+      if (typeof v === 'string' && (k === 'photo' || k === 'avatarPhoto')) {
+        const lim = k === 'avatarPhoto' ? 40000 : (cloudOn ? 2000 : 120000);
+        if (v.length > lim) return '';
+      }
+      return v;
+    };
+    const put = (key, val) => { try { localStorage.setItem(key, val); } catch (e) {} };
+    if (state.user) put(LS_KEYS.session, JSON.stringify(state.user, rep));
+    else { try { localStorage.removeItem(LS_KEYS.session); } catch (e) {} }
+    put(LS_KEYS.accounts, JSON.stringify(registeredAccounts, rep));
+    put(LS_KEYS.tombstones, JSON.stringify({
+      accounts: Array.from(deletedAccountIds),
+      requests: Array.from(deletedRequestIds),
+      calendar: Array.from(deletedCalendarKeys)
+    }));
+    put(LS_KEYS.requests, JSON.stringify(state.teamRequests, rep));
+    put(LS_KEYS.calendar, JSON.stringify(allCloudCalendarItems, rep));
+  };
+
+  window.getAppSyncSnapshot = function () {
+    return {
+      accounts: registeredAccounts,
+      requests: state.teamRequests,
+      calendar: allCloudCalendarItems,
+      tombstones: {
+        accounts: Array.from(deletedAccountIds),
+        requests: Array.from(deletedRequestIds),
+        calendar: Array.from(deletedCalendarKeys)
+      }
+    };
+  };
+
+  window.applyLiveEvent = function (evt) {
+    if (!evt || !evt.action || !evt.data) return false;
+    const d = evt.data;
+    let changed = false;
+
+    if (evt.action === 'upsert_account') {
+      const id = (d.empId || '').trim().toUpperCase();
+      if (id && !deletedAccountIds.has(id)) {
+        registeredAccounts[id] = {
+          ...(registeredAccounts[id] || {}),
+          ...d,
+          empId: id,
+          avatarPhoto: d.avatarPhoto || (registeredAccounts[id] && registeredAccounts[id].avatarPhoto) || ''
+        };
+        changed = true;
+      }
+    } else if (evt.action === 'delete_account') {
+      const id = (d.empId || '').trim().toUpperCase();
+      if (id && id !== APPROVER_ID) {
+        deletedAccountIds.add(id);
+        delete registeredAccounts[id];
+        state.teamRequests.forEach(r => {
+          if ((r.empId || '').trim().toUpperCase() === id) deletedRequestIds.add(r.id);
+        });
+        state.teamRequests = state.teamRequests.filter(r => (r.empId || '').trim().toUpperCase() !== id);
+        allCloudCalendarItems.forEach(c => {
+          if ((c.empId || '').trim().toUpperCase() === id) deletedCalendarKeys.add(`${id}_${c.dateKey}`);
+        });
+        allCloudCalendarItems = allCloudCalendarItems.filter(c => (c.empId || '').trim().toUpperCase() !== id);
+        changed = true;
+      }
+    } else if (evt.action === 'upsert_request') {
+      const empId = (d.empId || '').trim().toUpperCase();
+      if (d.id && !deletedRequestIds.has(d.id) && !deletedAccountIds.has(empId)) {
+        ensureAccountFromMeta(empId, d.firstName, d.lastName, d.mood, '');
+        const idx = state.teamRequests.findIndex(r => r.id === d.id);
+        if (idx >= 0) {
+          state.teamRequests[idx] = {
+            ...state.teamRequests[idx],
+            ...d,
+            photo: d.photo || state.teamRequests[idx].photo || ''
+          };
+        } else {
+          state.teamRequests.unshift(d);
+        }
+        changed = true;
+      }
+    } else if (evt.action === 'delete_request') {
+      if (d.id) {
+        deletedRequestIds.add(d.id);
+        state.teamRequests = state.teamRequests.filter(r => r.id !== d.id);
+        changed = true;
+      }
+    } else if (evt.action === 'upsert_calendar') {
+      const empId = (d.empId || '').trim().toUpperCase();
+      if (d.dateKey && !deletedAccountIds.has(empId)) {
+        ensureAccountFromMeta(empId, d.firstName, d.lastName, d.mood, '');
+        const key = `${empId}_${d.dateKey}`;
+        if (!deletedCalendarKeys.has(key)) {
+          allCloudCalendarItems = allCloudCalendarItems.filter(c => `${(c.empId || '').trim().toUpperCase()}_${c.dateKey}` !== key);
+          allCloudCalendarItems.push({ ...d, empId });
+          changed = true;
+        }
+      }
+    } else if (evt.action === 'delete_calendar') {
+      const empId = (d.empId || '').trim().toUpperCase();
+      if (d.dateKey) {
+        const key = `${empId}_${d.dateKey}`;
+        deletedCalendarKeys.add(key);
+        allCloudCalendarItems = allCloudCalendarItems.filter(c => `${(c.empId || '').trim().toUpperCase()}_${c.dateKey}` !== key);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      window.persistLocalDatabase();
+      rebuildVisibleCalendarItems();
+      if (state.user) renderApp();
+    }
+    return changed;
+  };
+
+  window.mergeCloudSnapshot = function (remote) {
+    if (!remote || typeof remote !== 'object') return false;
+    let changed = false;
+
+    const rTomb = remote.tombstones || {};
+    (rTomb.accounts || []).forEach(id => {
+      const up = String(id).trim().toUpperCase();
+      if (up && !deletedAccountIds.has(up)) {
+        deletedAccountIds.add(up);
+        changed = true;
+      }
+    });
+    (rTomb.requests || []).forEach(id => {
+      if (id && !deletedRequestIds.has(id)) {
+        deletedRequestIds.add(id);
+        changed = true;
+      }
+    });
+    (rTomb.calendar || []).forEach(k => {
+      if (k && !deletedCalendarKeys.has(k)) {
+        deletedCalendarKeys.add(k);
+        changed = true;
+      }
+    });
+
+    deletedAccountIds.forEach(delId => {
+      if (registeredAccounts[delId]) {
+        delete registeredAccounts[delId];
+        changed = true;
+      }
+    });
+
+    Object.entries(remote.accounts || {}).forEach(([rawId, acc]) => {
+      if (!acc) return;
+      const empId = String(acc.empId || rawId).trim().toUpperCase();
+      if (!empId || deletedAccountIds.has(empId)) return;
+      const existing = registeredAccounts[empId];
+      if (!existing || (acc.updatedAt || 0) > (existing.updatedAt || 0)) {
+        registeredAccounts[empId] = {
+          ...existing,
+          ...acc,
+          empId,
+          avatarPhoto: acc.avatarPhoto || (existing && existing.avatarPhoto) || ''
+        };
+        changed = true;
+      }
+    });
+
+    const reqMap = new Map();
+    state.teamRequests.forEach(r => {
+      const empUp = (r.empId || '').trim().toUpperCase();
+      if (!deletedRequestIds.has(r.id) && !deletedAccountIds.has(empUp)) {
+        reqMap.set(r.id, r);
+      } else {
+        changed = true;
+      }
+    });
+
+    (remote.requests || []).forEach(r => {
+      if (!r || !r.id) return;
+      const empUp = (r.empId || '').trim().toUpperCase();
+      if (deletedRequestIds.has(r.id) || deletedAccountIds.has(empUp)) return;
+      if (ensureAccountFromMeta(empUp, r.firstName, r.lastName, r.mood, '')) changed = true;
+      const localReq = reqMap.get(r.id);
+      if (!localReq || (r.updatedAt || 0) > (localReq.updatedAt || 0) || (localReq.status === 'submitted' && r.status !== 'submitted')) {
+        reqMap.set(r.id, {
+          ...localReq,
+          ...r,
+          photo: r.photo || (localReq && localReq.photo) || ''
+        });
+        changed = true;
+      }
+    });
+    state.teamRequests = Array.from(reqMap.values()).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+
+    const calMap = new Map();
+    allCloudCalendarItems.forEach(c => {
+      const empUp = (c.empId || '').trim().toUpperCase();
+      const key = `${empUp}_${c.dateKey}`;
+      if (!deletedCalendarKeys.has(key) && !deletedAccountIds.has(empUp)) {
+        calMap.set(key, c);
+      } else {
+        changed = true;
+      }
+    });
+
+    (remote.calendar || []).forEach(c => {
+      if (!c || !c.dateKey) return;
+      const empUp = (c.empId || '').trim().toUpperCase();
+      const key = `${empUp}_${c.dateKey}`;
+      if (deletedCalendarKeys.has(key) || deletedAccountIds.has(empUp)) return;
+      if (ensureAccountFromMeta(empUp, c.firstName, c.lastName, c.mood, '')) changed = true;
+      const localCal = calMap.get(key);
+      if (!localCal || (c.updatedAt || 0) > (localCal.updatedAt || 0)) {
+        calMap.set(key, {
+          ...localCal,
+          ...c,
+          photo: c.photo || (localCal && localCal.photo) || ''
+        });
+        changed = true;
+      }
+    });
+    allCloudCalendarItems = Array.from(calMap.values());
+
+    if (changed) {
+      window.persistLocalDatabase();
+      rebuildVisibleCalendarItems();
+      if (state.user) renderApp();
+    } else {
+      rebuildVisibleCalendarItems();
+    }
+    return changed;
+  };
+
+  window.syncAccountsFromCloud = (list) => {
+    const map = {};
+    (list || []).forEach(a => { if (a && a.empId) map[a.empId.toUpperCase()] = a; });
+    window.mergeCloudSnapshot({ accounts: map });
+  };
+  window.syncRequestsFromCloud = (list) => {
+    window.mergeCloudSnapshot({ requests: list || [] });
+  };
+  window.syncCalendarFromCloud = (list) => {
+    window.mergeCloudSnapshot({ calendar: list || [] });
+  };
+
+  // กติกา OT: ทำงานปกติ 8 ชม. + พัก 1 ชม. = 9 ชม. ชั่วโมงที่เกินจากนั้นจึงนับเป็น OT
+  const WORK_STD_HOURS = 8;
+  const BREAK_HOURS = 1;
+
+  // เวลาทำงานรวมทั้งหมด (เข้างาน → เลิกงาน) รวมเวลาพัก
+  function calcWorkHours(tIn, tOut) {
+    if (!tIn || !tOut) return 0;
+    const [h1, m1] = tIn.split(':').map(Number);
+    const [h2, m2] = tOut.split(':').map(Number);
+    let diff = (h2 * 60 + m2) - (h1 * 60 + m1);
+    if (diff < 0) diff += 24 * 60;
+    return Math.round((diff / 60) * 100) / 100;
+  }
+
+  // ชั่วโมง OT = เวลาทำงานรวม − (8 + 1 พัก) ถ้าไม่เกิน 9 ชม. = 0
+  function calcHours(tIn, tOut) {
+    const work = calcWorkHours(tIn, tOut);
+    return Math.max(0, Math.round((work - (WORK_STD_HOURS + BREAK_HOURS)) * 100) / 100);
+  }
+
+  // OT ของคำขอหนึ่งรายการ — คำนวณจากเวลาเข้า-เลิกด้วยกติกาปัจจุบันเสมอ (รายการเก่าก็ใช้กติกาเดียวกัน)
+  function otHoursOf(r) {
+    if (!r || r.type !== 'ot') return 0;
+    if (r.timeIn && r.timeOut) return calcHours(r.timeIn, r.timeOut);
+    return Number(r.hours) || 0;
+  }
+  function fmtH(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+
+  function formatThaiShort(dateKey) {
+    if (!dateKey) return '';
+    const [y, m, d] = dateKey.split('-').map(Number);
+    return `${d} ${THAI_MONTHS_SHORT[m - 1]} ${y + 543}`;
+  }
+
+  function formatThaiFull(dateKey) {
+    if (!dateKey) return '';
+    const [y, m, d] = dateKey.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    return `วัน${THAI_DAYS_FULL[dt.getDay()]}ที่ ${d} ${THAI_MONTHS[m - 1]} ${y + 543}`;
+  }
+
+  function rebuildVisibleCalendarItems() {
+    let metaChanged = false;
+    state.teamRequests.forEach(r => {
+      if (ensureAccountFromMeta(r.empId, r.firstName, r.lastName, r.mood, '')) {
+        metaChanged = true;
+      }
+    });
+
+    const nextItems = {};
+    const myId = (state.user?.empId || '').trim().toUpperCase();
+    const manager = isManager();
+    const activeIds = new Set(Object.keys(registeredAccounts).map(k => k.trim().toUpperCase()));
+    let synthesizedCount = 0;
+
+    allCloudCalendarItems.forEach((it) => {
+      const itemEmp = (it.empId || '').trim().toUpperCase();
+      if (itemEmp && itemEmp !== APPROVER_ID && deletedAccountIds.has(itemEmp)) return;
+      if (itemEmp && itemEmp !== APPROVER_ID && ensureAccountFromMeta(itemEmp, it.firstName, it.lastName, it.mood, '')) {
+        metaChanged = true;
+      }
+      if (manager || itemEmp === myId) {
+        nextItems[it.dateKey] = it;
+      }
+
+      if (itemEmp && itemEmp !== APPROVER_ID) {
+        const autoReqId = `auto-${itemEmp}-${it.dateKey}-${it.type || 'ot'}`;
+        const alreadyExists = state.teamRequests.some(
+          r => r.id === autoReqId || ((r.empId || '').trim().toUpperCase() === itemEmp && r.from === it.dateKey && r.type === (it.type || 'ot'))
+        );
+        if (!alreadyExists && !deletedRequestIds.has(autoReqId)) {
+          const acc = registeredAccounts[itemEmp] || {};
+          const isOt = (it.type || 'ot') === 'ot';
+          state.teamRequests.unshift({
+            id: autoReqId,
+            firstName: acc.firstName || it.firstName || `พนักงาน ${itemEmp}`,
+            lastName: acc.lastName || it.lastName || '',
+            empId: itemEmp,
+            approverId: APPROVER_ID,
+            type: isOt ? 'ot' : 'leave',
+            from: it.dateKey,
+            to: it.to || it.dateKey,
+            timeIn: it.timeIn || '18:00',
+            timeOut: it.timeOut || '21:00',
+            checkoutTime: it.checkoutTime || '',
+            checkoutLocation: it.checkoutLocation || '',
+            hours: isOt ? calcHours(it.timeIn || '18:00', it.timeOut || '21:00') : 0,
+            note: it.note || (isOt ? 'ปฏิบัติงานล่วงเวลา (OT)' : 'ลาพักร้อน'),
+            photo: it.photo || '',
+            mood: it.mood || 'happy',
+            updatedAt: Date.now(),
+            status: 'submitted'
+          });
+          synthesizedCount += 1;
+        }
+      }
+    });
+
+    if (synthesizedCount > 0 || metaChanged) {
+      window.persistLocalDatabase();
+    }
+    state.items = nextItems;
+  }
+
+  // =========================================================================
+  // Auth / Login / Registration
+  // =========================================================================
+  let authMode = 'login';
+
+  function setAuthMode(mode) {
+    authMode = mode;
+    const btnLogin = document.getElementById('btnAuthLoginMode');
+    const btnReg = document.getElementById('btnAuthRegisterMode');
+    const nameGroup = document.getElementById('nameFieldsGroup');
+    const submitBtn = document.getElementById('btnAuthSubmit');
+
+    if (mode === 'login') {
+      btnLogin.className = 'comic-pill py-2 text-xs font-bold bg-[#ffb98a] text-[#1e1b4b] border-white';
+      btnReg.className = 'comic-pill py-2 text-xs font-bold bg-[#2c2866] text-white border-[#7a76a3]';
+      nameGroup.classList.add('hidden');
+      submitBtn.textContent = 'เข้าใช้งานระบบ';
+    } else {
+      btnReg.className = 'comic-pill py-2 text-xs font-bold bg-[#c6f3dc] text-[#1e1b4b] border-white';
+      btnLogin.className = 'comic-pill py-2 text-xs font-bold bg-[#2c2866] text-white border-[#7a76a3]';
+      nameGroup.classList.remove('hidden');
+      submitBtn.textContent = '✨ สร้างรหัสและเข้าใช้งาน';
+    }
+    onAuthEmpIdChange();
+  }
+
+  function onAuthEmpIdChange() {
+    const empId = (document.getElementById('inpEmpId')?.value || '').trim().toUpperCase();
+    const isSm = empId === APPROVER_ID;
+    const badge = document.getElementById('approverRecognizedBadge');
+    const resetBtn = document.getElementById('btnResetSmPass');
+    const nameGroup = document.getElementById('nameFieldsGroup');
+
+    if (isSm) {
+      badge.classList.remove('hidden');
+      resetBtn.classList.remove('hidden');
+      nameGroup.classList.add('hidden');
+      if (authMode === 'register') {
+        authMode = 'login';
+        document.getElementById('btnAuthLoginMode').className = 'comic-pill py-2 text-xs font-bold bg-[#ffb98a] text-[#1e1b4b] border-white';
+        document.getElementById('btnAuthRegisterMode').className = 'comic-pill py-2 text-xs font-bold bg-[#2c2866] text-white border-[#7a76a3]';
+        document.getElementById('btnAuthSubmit').textContent = 'เข้าใช้งานระบบ SM';
+      }
+    } else {
+      badge.classList.add('hidden');
+      resetBtn.classList.add('hidden');
+      if (authMode === 'register') {
+        nameGroup.classList.remove('hidden');
+      }
+    }
+  }
+
+  async function verifySmPassword(pass) {
+    const cs = window.cloudStore;
+    if (cs && cs.isReady() && !cs.settingsReady()) return 'wait';
+    const h = await otoHash(APPROVER_ID, pass);
+    const cloudHash = (cs && cs.getSmHash && cs.getSmHash()) || '';
+    if (cloudHash) return h === cloudHash;
+    const legacy = localStorage.getItem(LS_KEYS.smPass);
+    if (legacy && pass === legacy) {
+      if (cs && cs.isReady()) cs.setSmHash(h);
+      return true;
+    }
+    return h === DEFAULT_SM_HASH;
+  }
+
+  async function resetSmPasswordPrompt() {
+    const cur = prompt('ใส่รหัสผ่าน SM ปัจจุบันเพื่อยืนยันตัวตน:');
+    if (cur === null) return;
+    const ok = await verifySmPassword(cur.trim());
+    if (ok !== true) { showToast(ok === 'wait' ? 'กำลังเชื่อมต่อฐานข้อมูล กรุณาลองใหม่อีกครั้ง' : 'รหัสผ่านปัจจุบันไม่ถูกต้อง'); return; }
+    const np = prompt('ตั้งรหัสผ่านใหม่สำหรับ SM2080797 (อย่างน้อย 6 ตัวอักษร):');
+    if (!np || np.trim().length < 6) { showToast('รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร'); return; }
+    if (!(window.cloudStore && window.cloudStore.isReady())) { showToast('ต้องเชื่อมฐานข้อมูลกลางก่อน จึงจะเปลี่ยนรหัสผ่านให้มีผลทุกเครื่องได้'); return; }
+    const h = await otoHash(APPROVER_ID, np.trim());
+    try { localStorage.removeItem(LS_KEYS.smPass); } catch (e) {}
+    await window.cloudStore.setSmHash(h);
+    showToast('🔄 เปลี่ยนรหัสผ่าน SM2080797 แล้ว (มีผลทุกเครื่อง)');
+  }
+
+  async function handleLogin() {
+    const empId = (document.getElementById('inpEmpId').value || '').trim().toUpperCase();
+    const pass = (document.getElementById('inpPassword').value || '').trim();
+    const first = (document.getElementById('inpFirst').value || '').trim();
+    const last = (document.getElementById('inpLast').value || '').trim();
+
+    if (!empId) {
+      showToast('กรุณากรอกรหัสพนักงาน');
+      return;
+    }
+
+    if (window.cloudStore && window.cloudStore.pullFromCloud) {
+      await window.cloudStore.pullFromCloud(false);
+    }
+
+    if (empId === APPROVER_ID) {
+      const smOk = await verifySmPassword(pass);
+      if (smOk !== true) {
+        showToast(smOk === 'wait' ? 'กำลังเชื่อมต่อฐานข้อมูล กรุณากดเข้าสู่ระบบอีกครั้ง' : 'รหัสผ่าน SM ไม่ถูกต้อง');
+        return;
+      }
+      const existingSm = registeredAccounts[APPROVER_ID] || {};
+      state.user = {
+        empId: APPROVER_ID,
+        firstName: 'นาย ณัฐวุฒิ',
+        lastName: 'ชุมหิรัญ',
+        mood: existingSm.mood || 'happy',
+        avatarPhoto: existingSm.avatarPhoto || ''
+      };
+      window.persistLocalDatabase();
+      enterAuthenticatedApp();
+      return;
+    }
+
+    if (authMode === 'register') {
+      if (!first) {
+        showToast('กรุณากรอกชื่อพนักงาน');
+        return;
+      }
+      if (!pass) {
+        showToast('กรุณาตั้งรหัสผ่าน');
+        return;
+      }
+      const dup = registeredAccounts[empId] || (window.cloudStore && window.cloudStore.fetchAccount ? await window.cloudStore.fetchAccount(empId) : null);
+      if (dup && (dup.pwHash || dup.password)) {
+        showToast('รหัสพนักงานนี้มีผู้ใช้งานแล้ว กรุณากดเข้าสู่ระบบ หรือใช้รหัสอื่น');
+        return;
+      }
+      if (deletedAccountIds.has(empId)) {
+        deletedAccountIds.delete(empId);
+      }
+      const acc = {
+        empId,
+        firstName: first,
+        lastName: last,
+        pwHash: await otoHash(empId, pass),
+        mood: 'happy',
+        avatarPhoto: '',
+        updatedAt: Date.now()
+      };
+      registeredAccounts[empId] = acc;
+      state.user = { ...acc };
+      window.persistLocalDatabase();
+      if (window.cloudStore) await window.cloudStore.saveAccount(acc);
+      showToast(window.__otoCloudOn ? `✨ สร้างรหัส ${empId} สำเร็จ! ส่งขึ้นระบบกลางแล้ว` : `✨ สร้างรหัส ${empId} สำเร็จ! (บันทึกในเครื่องนี้ ยังไม่ได้เชื่อมฐานข้อมูลกลาง)`);
+      enterAuthenticatedApp();
+      return;
+    }
+
+    let acc = registeredAccounts[empId];
+    if (!acc && window.cloudStore && window.cloudStore.fetchAccount) {
+      acc = await window.cloudStore.fetchAccount(empId);
+    }
+    if (!acc) {
+      showToast('ไม่พบรหัสพนักงานนี้ กดปุ่ม "✨ สร้างรหัสพนักงาน" ด้านบนเพื่อลงทะเบียน');
+      return;
+    }
+    if (acc.pwHash) {
+      if ((await otoHash(empId, pass)) !== acc.pwHash) {
+        showToast('รหัสผ่านไม่ถูกต้อง กรุณาลองอีกครั้ง');
+        return;
+      }
+    } else {
+      if (acc.password && pass !== acc.password) {
+        showToast('รหัสผ่านไม่ถูกต้อง กรุณาลองอีกครั้ง');
+        return;
+      }
+      if (!pass) {
+        showToast('บัญชีนี้ยังไม่มีรหัสผ่าน กรุณาพิมพ์รหัสผ่านใหม่ที่ต้องการตั้ง');
+        return;
+      }
+      acc.pwHash = await otoHash(empId, pass);
+      delete acc.password;
+      acc.updatedAt = Date.now();
+      registeredAccounts[empId] = acc;
+      window.persistLocalDatabase();
+      if (window.cloudStore) window.cloudStore.saveAccount(acc);
+    }
+
+    state.user = { ...acc };
+    window.persistLocalDatabase();
+    enterAuthenticatedApp();
+  }
+
+  function enterAuthenticatedApp() {
+    document.getElementById('loginScreen').classList.add('hidden');
+    state.activeTab = isManager() ? 'app' : 'cal';
+    rebuildVisibleCalendarItems();
+    renderApp();
+    if (window.cloudStore) {
+      window.cloudStore.pullFromCloud(false);
+    }
+  }
+
+  function logoutUser() {
+    state.user = null;
+    localStorage.removeItem(LS_KEYS.session);
+    document.getElementById('loginScreen').classList.remove('hidden');
+    document.getElementById('inpPassword').value = '';
+    showToast('ออกจากระบบเรียบร้อย');
+  }
+
+  // =========================================================================
+  // Header, Navigation & Live Clock
+  // =========================================================================
+  function getThaiTimeStr() {
+    const now = new Date();
+    const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+    const th = new Date(utc + 7 * 3600000);
+    return th.toTimeString().slice(0, 8) + ' น.';
+  }
+
+  function renderHeader() {
+    if (!state.user) return;
+    const header = document.getElementById('appHeader');
+    const manager = isManager();
+    const titles = {
+      cal: { main: 'ปฏิทินโอที & ลาพักร้อน', sub: manager ? 'โหมดผู้อนุมัติ (SM2080797) · ตรวจสอบภาพรวมทีม' : 'แตะที่วันที่เพื่อขอโอที (OT) หรือลาพักร้อน' },
+      sum: { main: 'สรุปชั่วโมงโอที & วันลา', sub: manager ? 'ภาพรวมทีมและรายบุคคล (ตรวจสอบอย่างเดียว)' : 'ติดตามยอดสะสมและประวัติคำขอของฉัน' },
+      app: { main: 'อนุมัติคำขอ (SM2080797)', sub: 'ตรวจสอบและอนุมัติคำขอ (ไม่สามารถแก้ไขเวลาของพนักงานได้)' },
+      pro: { main: 'โปรไฟล์ & ตั้งค่าทีม', sub: manager ? 'จัดการบัญชีพนักงานและฐานข้อมูลกลาง' : 'ข้อมูลพนักงานและการซิงค์ออนไลน์' }
+    };
+    const t = titles[state.activeTab] || titles.cal;
+
+    header.innerHTML = `
+      <div class="flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="font-brand text-2xl text-[#1e1b4b] tracking-tight">oto</span>
+          <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full border-2 border-[#1e1b4b] ${manager ? 'bg-[#ffe6d3]' : 'bg-[#e5e2ff]'}">
+            ${manager ? 'ผู้อนุมัติ · SM2080797' : state.user.empId}
+          </span>
+          <button type="button" id="headerCloudBadge" onclick="window.cloudStore && window.cloudStore.pullFromCloud(true)" class="text-[10px] px-2.5 py-0.5 rounded-full bg-[#c6f3dc] border border-[#1e1b4b] font-bold text-[#1e1b4b]">
+            ☁️ ออนไลน์ ✓
+          </button>
+        </div>
+        <button type="button" onclick="switchTab('pro')" class="rounded-full border-2 border-[#1e1b4b] p-0.5 bg-white shadow-sm shrink-0">
+          ${renderMoodSvg(state.user.mood, 34, state.user.avatarPhoto)}
+        </button>
+      </div>
+
+      <h1 class="text-xl font-bold text-[#1e1b4b] mt-2 leading-tight">${t.main}</h1>
+      <p class="text-xs text-[#7a76a3] mt-0.5">${t.sub}</p>
+
+      <div class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-[#1e1b4b] bg-[#f6f5ff] text-[11px] font-bold">
+        <span>🇹🇭 เวลาไทย (UTC+7):</span>
+        <span id="liveThaiClock" class="text-[#4f46e5]">${getThaiTimeStr()}</span>
+      </div>
+
+      <svg class="wave-divider" viewBox="0 0 400 22" preserveAspectRatio="none">
+        <path d="M0,0 L400,0 L400,8 Q350,22 300,10 T200,10 T100,10 T0,10 Z" fill="#ffffff"/>
+      </svg>
+    `;
+  }
+
+  function renderNav() {
+    const nav = document.getElementById('appNav');
+    const manager = isManager();
+    const pendingCount = state.teamRequests.filter(r => r.status === 'submitted').length;
+
+    const tabs = [
+      { id: 'cal', label: 'ปฏิทิน', icon: '📅' },
+      { id: 'sum', label: 'สรุป', icon: '📊' },
+      ...(manager ? [{ id: 'app', label: 'อนุมัติ', icon: '✅', badge: pendingCount }] : []),
+      { id: 'pro', label: 'โปรไฟล์', icon: '😊' }
+    ];
+
+    nav.innerHTML = tabs.map(t => `
+      <div class="nav-item ${state.activeTab === t.id ? 'active' : ''}" onclick="switchTab('${t.id}')">
+        <div class="nav-icon-wrap">
+          <span class="text-lg">${t.icon}</span>
+        </div>
+        ${t.badge ? `<span class="absolute -top-2 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#ff4d8d] text-white border border-[#1e1b4b] text-[10px] font-bold flex items-center justify-center">${t.badge}</span>` : ''}
+        <span>${t.label}</span>
+      </div>
+    `).join('');
+  }
+
+  function switchTab(tabId) {
+    state.activeTab = tabId;
+    renderApp();
+    if (window.cloudStore && (tabId === 'app' || tabId === 'sum' || tabId === 'pro')) {
+      window.cloudStore.pullFromCloud(false);
+    }
+  }
+
+  // =========================================================================
+  // Calendar View & Leave Range Helpers
+  // =========================================================================
+  function getLeaveDateMap() {
+    const map = {};
+    const activeIds = new Set(Object.keys(registeredAccounts).map(k => k.trim().toUpperCase()));
+
+    const addRange = (fromStr, toStr, info) => {
+      if (!fromStr) return;
+      const start = new Date(fromStr + 'T00:00:00');
+      const end = new Date((toStr || fromStr) + 'T00:00:00');
+      if (isNaN(start.getTime())) return;
+      const cur = new Date(start);
+      let guard = 0;
+      while (cur <= end && guard < 60) {
+        const y = cur.getFullYear();
+        const m = String(cur.getMonth() + 1).padStart(2, '0');
+        const d = String(cur.getDate()).padStart(2, '0');
+        map[`${y}-${m}-${d}`] = info;
+        cur.setDate(cur.getDate() + 1);
+        guard++;
+      }
+    };
+
+    const myId = (state.user?.empId || '').trim().toUpperCase();
+    const manager = isManager();
+
+    state.teamRequests.forEach(r => {
+      if (r.type !== 'leave' || r.status === 'rejected') return;
+      const empUp = (r.empId || '').trim().toUpperCase();
+      if (activeIds.size > 0 && !activeIds.has(empUp)) return;
+      if (manager || empUp === myId) {
+        addRange(r.from, r.to, { empId: empUp, firstName: r.firstName, mood: r.mood || 'calm' });
+      }
+    });
+
+    Object.values(state.items).forEach(it => {
+      if (it.type === 'leave') {
+        const empUp = (it.empId || '').trim().toUpperCase();
+        if (activeIds.size > 0 && empUp && !activeIds.has(empUp)) return;
+        addRange(it.dateKey, it.to || it.dateKey, { empId: empUp, mood: it.mood || 'calm' });
+      }
+    });
+
+    return map;
+  }
+
+  function renderCalendarTab() {
+    const year = state.viewYear;
+    const month = state.viewMonth;
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const prevDays = new Date(year, month, 0).getDate();
+    const leaveMap = getLeaveDateMap();
+
+    const now = new Date();
+    const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    let totalOtHours = 0;
+    let totalLeaveDays = 0;
+    const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}-`;
+
+    Object.values(state.items).forEach(it => {
+      if (it.dateKey && it.dateKey.startsWith(monthPrefix) && it.type === 'ot') {
+        totalOtHours += calcHours(it.timeIn, it.timeOut);
+      }
+    });
+    Object.keys(leaveMap).forEach(dk => {
+      if (dk.startsWith(monthPrefix)) totalLeaveDays += 1;
+    });
+
+    const cells = [];
+    for (let i = firstDay - 1; i >= 0; i--) {
+      cells.push(`<div class="day-cell other-month"><span class="text-xs font-bold">${prevDays - i}</span></div>`);
+    }
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const item = state.items[dateKey];
+      const leaveInfo = leaveMap[dateKey];
+      const isToday = dateKey === todayKey;
+
+      let extraClass = '';
+      let middleContent = '';
+      let bottomBadge = '';
+
+      const iconIdx = (d + state.iconSeed) % COSMIC_ICONS.length;
+      const iconId = (item && item.icon) || COSMIC_ICONS[iconIdx].id;
+
+      if (leaveInfo) {
+        extraClass = 'has-leave';
+        middleContent = `<div class="w-6 h-6 rounded-lg bg-[#1e1b4b] flex items-center justify-center">${renderCosmicSvg(iconId, 16)}</div>`;
+        bottomBadge = `<span class="day-badge-leave text-[8px] leading-tight font-bold px-1 py-0.2 rounded border">ลาพักร้อน</span>`;
+      } else if (item && item.type === 'ot') {
+        extraClass = 'has-ot';
+        const hrs = calcHours(item.timeIn, item.timeOut);
+        middleContent = `<div class="w-6 h-6 rounded-lg bg-[#1e1b4b] flex items-center justify-center">${renderCosmicSvg(iconId, 16)}</div>`;
+        bottomBadge = `<span class="text-[9px] font-bold px-1.5 rounded-full bg-white border border-[#1e1b4b] text-[#1e1b4b]">+${fmtH(hrs)}ชม.</span>`;
+      }
+
+      cells.push(`
+        <div class="day-cell ${isToday ? 'is-today' : ''} ${extraClass}" onclick="openDaySheet('${dateKey}')">
+          <span class="day-num text-xs font-bold text-[#1e1b4b]">${d}</span>
+          ${middleContent}
+          ${bottomBadge}
+        </div>
+      `);
+    }
+
+    const totalSlots = Math.ceil(cells.length / 7) * 7;
+    let nextDay = 1;
+    while (cells.length < totalSlots) {
+      cells.push(`<div class="day-cell other-month"><span class="text-xs font-bold">${nextDay++}</span></div>`);
+    }
+
+    return `
+      <div class="comic-card p-3.5">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-base font-bold text-[#1e1b4b]">${THAI_MONTHS[month]} ${year + 543}</h2>
+          <div class="flex items-center gap-1.5">
+            <button type="button" onclick="shuffleIcons()" class="comic-pill px-2.5 py-1 text-[11px] bg-white">🎲 สุ่มไอคอน</button>
+            <button type="button" onclick="changeMonth(-1)" class="w-7 h-7 rounded-full border-2 border-[#1e1b4b] bg-white font-bold text-xs flex items-center justify-center">‹</button>
+            <button type="button" onclick="changeMonth(1)" class="w-7 h-7 rounded-full border-2 border-[#1e1b4b] bg-white font-bold text-xs flex items-center justify-center">›</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-7 text-center text-[11px] font-bold text-[#7a76a3] mb-1.5">
+          ${THAI_DAYS_SHORT.map(d => `<div>${d}</div>`).join('')}
+        </div>
+
+        <div class="grid grid-cols-7 gap-1.5">
+          ${cells.join('')}
+        </div>
+
+        <div class="mt-3 pt-2.5 border-t border-dashed border-[#c7c3ea] flex items-center justify-between text-xs font-bold">
+          <div class="flex items-center gap-3">
+            <span>⚡ OT รวม: <span class="text-[#4f46e5]">${fmtH(totalOtHours)} ชม.</span></span>
+            <span>🌴 ลาพักร้อน: <span class="text-[#0d9488]">${totalLeaveDays} วัน</span></span>
+          </div>
+          ${isManager()
+            ? `<span class="px-2.5 py-1 rounded-full bg-[#ffe6d3] border border-[#1e1b4b] text-[10px]">🔒 SM ดูอย่างเดียว</span>`
+            : `<button type="button" onclick="goToday()" class="comic-pill px-3 py-1 text-[11px] bg-white">วันนี้</button>`
+          }
+        </div>
+      </div>
+
+      ${isManager() ? `
+        <div class="comic-card p-3 mt-3 bg-[#f0efff] text-center text-xs font-semibold text-[#1e1b4b]">
+          🛡️ สิทธิ์ผู้อนุมัติ <b>SM2080797</b> ไม่สามารถบันทึกหรือแก้ไขเวลาของใครได้ · ไปที่แท็บ <b>อนุมัติ</b> เพื่อตรวจสอบคำขอ
+        </div>
+      ` : ''}
+    `;
+  }
+
+  function changeMonth(delta) {
+    state.viewMonth += delta;
+    if (state.viewMonth < 0) {
+      state.viewMonth = 11;
+      state.viewYear -= 1;
+    } else if (state.viewMonth > 11) {
+      state.viewMonth = 0;
+      state.viewYear += 1;
+    }
+    renderApp();
+  }
+
+  function goToday() {
+    const now = new Date();
+    state.viewYear = now.getFullYear();
+    state.viewMonth = now.getMonth();
+    renderApp();
+  }
+
+  function shuffleIcons() {
+    state.iconSeed = (state.iconSeed + 1) % COSMIC_ICONS.length;
+    renderApp();
+  }
+
+  // =========================================================================
+  // Day Entry Sheet, Live Camera (Front/Rear), GPS & Checkout Photo
+  // =========================================================================
+  let editingDateKey = null;
+  let editingType = 'ot';
+  let editingMood = 'happy';
+  let currentPhoto = '';
+  let currentCheckoutTime = '';
+  let currentCheckoutLocation = '';
+  let activeCameraStream = null;
+  let cameraFacingMode = 'environment';
+  let draft = { timeIn: '', timeOut: '', note: '', leaveFrom: '', leaveTo: '' };
+  let currentCheckoutAddress = '';
+  let currentGpsCoords = '';
+  let cameraMirror = false;
+  let cameraRaf = 0;
+  let savingEntry = false;
+  let stampCode = '';
+
+  function stopLiveCamera() {
+    if (cameraRaf) { cancelAnimationFrame(cameraRaf); cameraRaf = 0; }
+    if (activeCameraStream) {
+      activeCameraStream.getTracks().forEach(t => t.stop());
+      activeCameraStream = null;
+    }
+    const camBox = document.getElementById('liveCameraContainer');
+    if (camBox) camBox.classList.add('hidden');
+  }
+
+  async function fetchCurrentGpsLocation() {
+    const locEl = document.getElementById('gpsStatusLabel');
+    if (locEl) locEl.textContent = 'กำลังดึงพิกัด GPS...';
+
+    if (!navigator.geolocation) {
+      currentCheckoutLocation = 'ไม่รองรับ GPS บนอุปกรณ์นี้';
+      if (locEl) locEl.textContent = currentCheckoutLocation;
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude.toFixed(5);
+        const lon = pos.coords.longitude.toFixed(5);
+        currentCheckoutLocation = `พิกัด ${lat}, ${lon}`;
+        currentGpsCoords = `${lat}, ${lon}`;
+        try {
+          const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&addressdetails=1&lat=${lat}&lon=${lon}&accept-language=th`);
+          if (resp.ok) {
+            const geo = await resp.json();
+            const ad = (geo && geo.address) || {};
+            const l1 = [[ad.house_number, ad.road].filter(Boolean).join(' '), ad.neighbourhood || ad.suburb].filter(Boolean).join(' ');
+            const l2 = [ad.city_district || ad.county || ad.city || ad.town, ad.state, ad.postcode].filter(Boolean).join(' ');
+            const addr = [l1, l2].filter(Boolean).join(' ').trim();
+            if (addr) {
+              currentCheckoutAddress = addr;
+              currentCheckoutLocation = addr;
+            } else if (geo && geo.display_name) {
+              currentCheckoutAddress = geo.display_name.split(',').slice(0, 4).join(' ').trim();
+              currentCheckoutLocation = currentCheckoutAddress;
+            }
+          }
+        } catch (e) {}
+        if (locEl) locEl.textContent = `📍 ${currentCheckoutLocation}`;
+      },
+      () => {
+        currentCheckoutLocation = 'ไม่สามารถเข้าถึง GPS (กรุณาเปิดสิทธิ์ตำแหน่ง)';
+        if (locEl) locEl.textContent = currentCheckoutLocation;
+      },
+      { enableHighAccuracy: true, timeout: 7000 }
+    );
+  }
+
+  function openDaySheet(dateKey) {
+    if (isManager()) {
+      const existing = state.items[dateKey];
+      if (!existing) {
+        showToast('สิทธิ์ผู้อนุมัติ SM2080797 ไม่สามารถบันทึกหรือแก้ไขเวลาของใครได้');
+        return;
+      }
+      const req = state.teamRequests.find(r => r.from === dateKey && (r.empId || '').toUpperCase() === (existing.empId || '').toUpperCase());
+      if (req) {
+        openApprovalDetail(req.id);
+      } else {
+        showToast(`รายการวันที่ ${formatThaiShort(dateKey)} (${existing.empId || ''})`);
+      }
+      return;
+    }
+
+    stopLiveCamera();
+    editingDateKey = dateKey;
+    const existing = state.items[dateKey];
+
+    currentPhoto = (existing && existing.photo) ? existing.photo : '';
+    currentCheckoutTime = (existing && existing.checkoutTime) ? existing.checkoutTime : '';
+    currentCheckoutLocation = (existing && existing.checkoutLocation) ? existing.checkoutLocation : '';
+    editingType = existing ? existing.type : 'ot';
+    editingMood = existing ? (existing.mood || 'happy') : 'happy';
+    currentCheckoutAddress = '';
+    currentGpsCoords = '';
+    draft = {
+      timeIn: (existing && existing.timeIn) || '',
+      timeOut: (existing && existing.timeOut) || '',
+      note: (existing && existing.note) || '',
+      leaveFrom: dateKey,
+      leaveTo: (existing && existing.to) || dateKey
+    };
+
+    renderDaySheet();
+    document.getElementById('daySheet').classList.add('open');
+    fetchCurrentGpsLocation();
+  }
+
+  function closeDaySheet() {
+    stopLiveCamera();
+    currentPhoto = '';
+    currentCheckoutTime = '';
+    currentCheckoutLocation = '';
+    currentCheckoutAddress = '';
+    currentGpsCoords = '';
+    draft = { timeIn: '', timeOut: '', note: '', leaveFrom: '', leaveTo: '' };
+    document.getElementById('daySheet').classList.remove('open');
+  }
+
+  function setEntryType(type) {
+    captureDraft();
+    editingType = type;
+    renderDaySheet();
+  }
+
+  function setEntryMood(moodId) {
+    captureDraft();
+    editingMood = moodId;
+    renderDaySheet();
+  }
+
+  function renderDaySheet() {
+    captureDraft();
+    renderDaySheetRaw();
+    refreshSaveState();
+  }
+
+  function renderDaySheetRaw() {
+    const timeIn = escAttr(draft.timeIn);
+    const timeOut = escAttr(draft.timeOut);
+    const note = escAttr(draft.note);
+    const leaveFrom = draft.leaveFrom || editingDateKey;
+    const leaveTo = draft.leaveTo || leaveFrom;
+
+    const sheet = document.getElementById('daySheetContent');
+    sheet.innerHTML = `
+      <div class="w-10 h-1.5 rounded-full bg-[#c7c3ea] mx-auto mb-3"></div>
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h3 class="text-base font-bold text-[#1e1b4b]">บันทึกโอที / ลาพักร้อน</h3>
+          <p class="text-xs text-[#7a76a3]">${formatThaiFull(editingDateKey)}</p>
+        </div>
+        <button type="button" onclick="closeDaySheet()" class="w-8 h-8 rounded-full border-2 border-[#1e1b4b] bg-white font-bold">✕</button>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 mb-3">
+        <button type="button" onclick="setEntryType('ot')" class="comic-pill py-2 text-xs font-bold ${editingType === 'ot' ? 'bg-[#ffb98a] text-[#1e1b4b]' : 'bg-white text-[#7a76a3]'}">
+          ⚡ ขอทำโอที (OT)
+        </button>
+        <button type="button" onclick="setEntryType('leave')" class="comic-pill py-2 text-xs font-bold ${editingType === 'leave' ? 'bg-[#0d9488] text-white' : 'bg-white text-[#7a76a3]'}">
+          🌴 ขอลาพักร้อน
+        </button>
+      </div>
+
+      ${editingType === 'ot' ? `
+        <div class="grid grid-cols-2 gap-2.5 mb-3">
+          <div>
+            <label class="block text-xs font-bold mb-1">เวลาเข้างาน <span class="text-[#e11d48]">*</span></label>
+            <input id="inpTimeIn" type="time" value="${timeIn}" oninput="refreshSaveState()" onchange="refreshSaveState()" class="comic-input" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold mb-1">เวลาเลิกงาน <span class="text-[#e11d48]">*</span></label>
+            <input id="inpTimeOut" type="time" value="${timeOut}" oninput="refreshSaveState()" onchange="refreshSaveState()" class="comic-input" />
+          </div>
+        </div>
+        <div id="otPreview" class="rounded-2xl border-2 border-dashed border-[#1e1b4b] bg-[#fff7ef] px-3 py-2 mb-3 text-[11px] font-semibold leading-relaxed"></div>
+      ` : `
+        <div class="grid grid-cols-2 gap-2.5 mb-3">
+          <div>
+            <label class="block text-xs font-bold mb-1">วันที่เริ่มลา</label>
+            <input id="inpLeaveFrom" type="date" value="${leaveFrom}" oninput="refreshSaveState()" onchange="refreshSaveState()" class="comic-input" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold mb-1">ถึงวันที่</label>
+            <input id="inpLeaveTo" type="date" value="${leaveTo}" oninput="refreshSaveState()" onchange="refreshSaveState()" class="comic-input" />
+          </div>
+        </div>
+      `}
+
+      <div class="mb-3">
+        <label class="block text-xs font-bold mb-1.5">ความรู้สึกวันนี้</label>
+        <div class="flex items-center justify-between gap-1.5">
+          ${MOODS.map(m => `
+            <button type="button" onclick="setEntryMood('${m.id}')" class="flex-1 py-1.5 rounded-2xl border-2 ${editingMood === m.id ? 'border-[#1e1b4b] bg-[#ffe6d3]' : 'border-transparent bg-white'} flex flex-col items-center gap-0.5">
+              ${renderMoodSvg(m.id, 28)}
+              <span class="text-[10px] font-bold">${m.label}</span>
+            </button>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="block text-xs font-bold mb-1">รายละเอียด / หมายเหตุ ${editingType === 'ot' ? '<span class="text-[#e11d48]">*</span>' : '(ไม่บังคับ)'}</label>
+        <input id="inpNote" type="text" value="${note}" oninput="refreshSaveState()" class="comic-input" placeholder="${editingType === 'ot' ? 'เช่น ปิดยอดประจำวัน / เคลียร์สต็อก' : 'เช่น ลาพักร้อนประจำปี'}" />
+      </div>
+
+      ${editingType === 'ot' ? `
+        <div class="comic-card p-3 mb-3 bg-white">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold">📸 รูปถ่ายเช็คเอาท์ + เวลา & GPS จริง <span class="text-[#e11d48]">*</span></span>
+            <span id="gpsStatusLabel" class="text-[10px] text-[#0d9488] font-bold truncate max-w-[165px]">
+              ${currentCheckoutLocation ? `📍 ${currentCheckoutLocation}` : 'พร้อมรับพิกัด GPS'}
+            </span>
+          </div>
+
+          <div id="liveCameraContainer" class="hidden mb-2.5">
+            <video id="liveCameraVideo" autoplay playsinline muted style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"></video>
+            <canvas id="liveCameraCanvas" width="480" height="640" class="w-full rounded-2xl border-2 border-[#1e1b4b] bg-black" style="max-height:62vh;object-fit:contain"></canvas>
+            <div class="grid grid-cols-2 gap-1.5 mt-2">
+              <button type="button" onclick="switchCameraFacing()" class="comic-pill py-2 text-[11px] bg-[#e5e2ff]">🔄 สลับกล้อง</button>
+              <button type="button" onclick="toggleCameraMirror()" class="comic-pill py-2 text-[11px] bg-[#fff1b8]">↔️ กลับภาพซ้าย-ขวา</button>
+              <button type="button" onclick="captureLivePhoto()" class="comic-btn py-2 text-xs bg-[#c6f3dc]">📸 กดถ่ายรูป</button>
+              <button type="button" onclick="stopLiveCamera()" class="comic-pill py-2 text-[11px] bg-[#ffd6e0]">✕ ปิดกล้อง</button>
+            </div>
+          </div>
+
+          ${currentPhoto ? `
+            <div class="relative mb-2">
+              <img src="${currentPhoto}" class="w-full max-h-96 object-contain bg-black rounded-2xl border-2 border-[#1e1b4b]" alt="เช็คเอาท์" />
+              <button type="button" onclick="clearCheckoutPhoto()" class="absolute top-2 right-2 px-2.5 py-1 rounded-full bg-[#ffd6e0] border border-[#1e1b4b] text-[11px] font-bold">🗑️ ลบรูป</button>
+            </div>
+          ` : `
+            <div class="grid grid-cols-2 gap-2">
+              <button type="button" onclick="startLiveCamera('environment')" class="comic-pill py-2.5 text-xs bg-[#d9f0ff] flex items-center justify-center gap-1">
+                <span>📷 กล้องหลัง</span>
+              </button>
+              <button type="button" onclick="startLiveCamera('user')" class="comic-pill py-2.5 text-xs bg-[#ffe6d3] flex items-center justify-center gap-1">
+                <span>🤳 กล้องหน้า</span>
+              </button>
+            </div>
+            <label class="mt-2 block w-full text-center comic-pill py-2 text-xs bg-[#f6f5ff] cursor-pointer">
+              🖼️ เลือกรูปจากอัลบั้ม
+              <input id="inpFilePhoto" type="file" accept="image/*" onchange="handleFilePhotoUpload(event)" class="hidden" />
+            </label>
+          `}
+        </div>
+      ` : ''}
+
+      <p id="entryProgress" class="text-[11px] font-bold text-center mb-1.5"></p>
+      <button id="btnSaveEntry" type="button" onclick="saveCurrentEntry()" class="comic-btn w-full py-3.5 bg-[#ffb98a] text-[#1e1b4b] text-sm">
+        ${editingType === 'ot' ? 'ส่งคำขอทำโอที (OT) ไปที่ SM2080797' : 'ส่งคำขอลาพักร้อนไปที่ SM2080797'}
+      </button>
+    `;
+  }
+
+  const TH_DOW = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+  const TH_MON = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+
+  function thaiNowParts() {
+    const now = new Date();
+    const th = new Date(now.getTime() + now.getTimezoneOffset() * 60000 + 7 * 3600000);
+    return {
+      hh: String(th.getHours()).padStart(2, '0'),
+      mm: String(th.getMinutes()).padStart(2, '0'),
+      dow: TH_DOW[th.getDay()],
+      d: String(th.getDate()).padStart(2, '0'),
+      mon: TH_MON[th.getMonth()],
+      y: th.getFullYear() + 543
+    };
+  }
+
+  function makeStampCode() {
+    const base = Date.now().toString(36) + ((state.user && state.user.empId) || '');
+    return base.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(-12);
+  }
+
+  function rrPath(ctx, x, y, w, h, tl, tr, br, bl) {
+    ctx.beginPath();
+    ctx.moveTo(x + tl, y);
+    ctx.lineTo(x + w - tr, y);
+    if (tr) ctx.arcTo(x + w, y, x + w, y + tr, tr);
+    ctx.lineTo(x + w, y + h - br);
+    if (br) ctx.arcTo(x + w, y + h, x + w - br, y + h, br);
+    ctx.lineTo(x + bl, y + h);
+    if (bl) ctx.arcTo(x, y + h, x, y + h - bl, bl);
+    ctx.lineTo(x, y + tl);
+    if (tl) ctx.arcTo(x, y, x + tl, y, tl);
+    ctx.closePath();
+  }
+
+  function wrapText(ctx, text, maxW) {
+    const words = String(text).split(/\s+/).filter(Boolean);
+    const lines = [];
+    let cur = '';
+    words.forEach((w) => {
+      const t = cur ? cur + ' ' + w : w;
+      if (ctx.measureText(t).width <= maxW) { cur = t; return; }
+      if (cur) lines.push(cur);
+      if (ctx.measureText(w).width <= maxW) { cur = w; return; }
+      let part = '';
+      for (const ch of w) {
+        if (ctx.measureText(part + ch).width > maxW) { lines.push(part); part = ch; } else { part += ch; }
+      }
+      cur = part;
+    });
+    if (cur) lines.push(cur);
+    return lines;
+  }
+
+  // ประทับเวลา/วันที่/ที่อยู่ลงบนภาพ ตามสไตล์แอปตอกบัตร (ป้ายเหลือง + เวลาใหญ่ + วันที่ + ที่อยู่)
+  function drawStamp(ctx, W, H) {
+    const p = thaiNowParts();
+    const u = W / 667;
+    const FONT = 'Kanit, Anuphan, sans-serif';
+    ctx.save();
+    const g = ctx.createLinearGradient(0, H * 0.5, 0, H);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(1, 'rgba(0,0,0,0.62)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, H * 0.5, W, H * 0.5);
+
+    const x0 = 16 * u, tx = x0 + 14 * u;
+    const addr = currentCheckoutAddress || (/^พิกัด/.test(currentCheckoutLocation || '') ? currentCheckoutLocation : 'ไม่พบตำแหน่ง GPS');
+    ctx.font = `500 ${22 * u}px ${FONT}`;
+    const lines = wrapText(ctx, addr, W * 0.74).slice(0, 3);
+    const coordLine = currentGpsCoords ? `Lat/Long ${currentGpsCoords}` : '';
+    const rows = lines.length + (coordLine ? 1 : 0);
+    const lh = 29 * u;
+    const footBase = H - 14 * u;
+    const addrBottom = footBase - 36 * u;
+    const addrTop = addrBottom - rows * lh;
+    const dateBase = addrTop - 8 * u;
+    const dateTop = dateBase - 30 * u;
+    const pillH = 54 * u;
+    const pillY = dateTop - 14 * u - pillH;
+
+    const lab = 'เช็คเอาท์';
+    ctx.font = `700 ${27 * u}px ${FONT}`;
+    const lw = ctx.measureText(lab).width + 30 * u;
+    const tm = `${p.hh}:${p.mm}`;
+    ctx.font = `700 ${42 * u}px ${FONT}`;
+    const tw = ctx.measureText(tm).width + 30 * u;
+    rrPath(ctx, x0, pillY, lw, pillH, 10 * u, 0, 0, 10 * u);
+    ctx.fillStyle = '#FFC21A'; ctx.fill();
+    rrPath(ctx, x0 + lw, pillY, tw, pillH, 0, 10 * u, 10 * u, 0);
+    ctx.fillStyle = '#FFFFFF'; ctx.fill();
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#1b1740';
+    ctx.font = `700 ${27 * u}px ${FONT}`;
+    ctx.fillText(lab, x0 + 15 * u, pillY + pillH / 2 + 1 * u);
+    ctx.font = `700 ${42 * u}px ${FONT}`;
+    ctx.fillText(tm, x0 + lw + 15 * u, pillY + pillH / 2 + 1 * u);
+
+    ctx.fillStyle = '#FFA21A';
+    ctx.fillRect(x0, dateTop, 4 * u, addrBottom - dateTop);
+
+    ctx.textBaseline = 'alphabetic';
+    ctx.shadowColor = 'rgba(0,0,0,0.7)';
+    ctx.shadowBlur = 5 * u;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = `700 ${28 * u}px ${FONT}`;
+    ctx.fillText(`${p.dow}, ${p.d} ${p.mon} ${p.y}`, tx, dateBase);
+    ctx.font = `500 ${22 * u}px ${FONT}`;
+    lines.forEach((ln, i) => ctx.fillText(ln, tx, addrTop + (i + 1) * lh - 7 * u));
+    if (coordLine) {
+      ctx.font = `400 ${17 * u}px ${FONT}`;
+      ctx.fillText(coordLine, tx, addrTop + rows * lh - 8 * u);
+    }
+
+    ctx.fillStyle = '#36C78C';
+    ctx.beginPath(); ctx.arc(x0 + 9 * u, footBase - 7 * u, 9 * u, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = `700 ${13 * u}px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.fillText('✓', x0 + 9 * u, footBase - 2.5 * u);
+    ctx.textAlign = 'left';
+    ctx.font = `500 ${18 * u}px ${FONT}`;
+    ctx.fillText('oto บันทึกเวลา & ตำแหน่ง', x0 + 26 * u, footBase);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#FFB98A';
+    ctx.font = `700 ${34 * u}px ${FONT}`;
+    ctx.fillText('oto', W - 18 * u, footBase - 22 * u);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = `500 ${16 * u}px ${FONT}`;
+    ctx.fillText('ภาพจริง 100%', W - 18 * u, footBase);
+
+    ctx.shadowBlur = 0;
+    ctx.save();
+    ctx.translate(W - 20 * u, 34 * u);
+    ctx.rotate(Math.PI / 2);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.font = `500 ${15 * u}px ${FONT}`;
+    ctx.fillText(`● oto Timestamp · ${stampCode || 'OTO'}`, 0, 0);
+    ctx.restore();
+    ctx.restore();
+  }
+
+  function paintFrame(ctx, src, W, H) {
+    ctx.save();
+    if (cameraMirror) { ctx.translate(W, 0); ctx.scale(-1, 1); }
+    ctx.drawImage(src, 0, 0, W, H);
+    ctx.restore();
+  }
+
+  function startCameraLoop() {
+    const v = document.getElementById('liveCameraVideo');
+    const c = document.getElementById('liveCameraCanvas');
+    if (!v || !c) return;
+    let last = 0;
+    const loop = (ts) => {
+      if (!activeCameraStream) return;
+      if (ts - last > 45 && v.videoWidth) {
+        last = ts;
+        const W = Math.min(v.videoWidth, 720);
+        const H = Math.round(v.videoHeight * W / v.videoWidth);
+        if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+        const ctx = c.getContext('2d');
+        paintFrame(ctx, v, W, H);
+        drawStamp(ctx, W, H);
+      }
+      cameraRaf = requestAnimationFrame(loop);
+    };
+    cameraRaf = requestAnimationFrame(loop);
+  }
+
+  async function startLiveCamera(facing) {
+    cameraFacingMode = facing || 'environment';
+    stampCode = makeStampCode();
+    fetchCurrentGpsLocation();
+    try {
+      stopLiveCamera();
+      if (document.fonts && document.fonts.load) {
+        try { await Promise.all([document.fonts.load('700 24px Kanit'), document.fonts.load('500 22px Kanit')]); } catch (e) {}
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: cameraFacingMode, width: { ideal: 1280 } },
+        audio: false
+      });
+      activeCameraStream = stream;
+      const camBox = document.getElementById('liveCameraContainer');
+      const videoEl = document.getElementById('liveCameraVideo');
+      if (camBox && videoEl) {
+        camBox.classList.remove('hidden');
+        videoEl.srcObject = stream;
+        try { await videoEl.play(); } catch (e) {}
+        startCameraLoop();
+      }
+    } catch (err) {
+      showToast('ไม่สามารถเปิดกล้องสดได้ กรุณากดเลือกรูปจากอัลบั้มด้านล่าง');
+    }
+  }
+
+  function switchCameraFacing() {
+    const nextFacing = cameraFacingMode === 'environment' ? 'user' : 'environment';
+    startLiveCamera(nextFacing);
+  }
+
+  function toggleCameraMirror() {
+    cameraMirror = !cameraMirror;
+    showToast(cameraMirror ? 'กลับภาพซ้าย-ขวา: เปิด' : 'กลับภาพซ้าย-ขวา: ปิด (ภาพที่บันทึกตรงกับที่เห็น)');
+  }
+
+  function captureLivePhoto() {
+    const v = document.getElementById('liveCameraVideo');
+    if (!v || !v.videoWidth) { showToast('กล้องยังไม่พร้อม กรุณารอสักครู่'); return; }
+    const W = Math.min(v.videoWidth, 960);
+    const H = Math.round(v.videoHeight * W / v.videoWidth);
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const ctx = c.getContext('2d');
+    paintFrame(ctx, v, W, H);
+    const p = thaiNowParts();
+    currentCheckoutTime = `${p.hh}:${p.mm}`;
+    drawStamp(ctx, W, H);
+    currentPhoto = c.toDataURL('image/jpeg', 0.8);
+    stopLiveCamera();
+    renderDaySheet();
+  }
+
+  function handleFilePhotoUpload(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+        const W = Math.min(iw, 960);
+        const H = Math.round(ih * W / iw);
+        const c = document.createElement('canvas');
+        c.width = W; c.height = H;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0, W, H);
+        stampCode = makeStampCode();
+        const p = thaiNowParts();
+        currentCheckoutTime = `${p.hh}:${p.mm}`;
+        drawStamp(ctx, W, H);
+        currentPhoto = c.toDataURL('image/jpeg', 0.8);
+        event.target.value = '';
+        renderDaySheet();
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearCheckoutPhoto() {
+    currentPhoto = '';
+    currentCheckoutTime = '';
+    const fileInput = document.getElementById('inpFilePhoto');
+    if (fileInput) fileInput.value = '';
+    renderDaySheet();
+  }
+
+  function escAttr(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  }
+
+  function captureDraft() {
+    const g = (id) => document.getElementById(id);
+    if (g('inpTimeIn')) draft.timeIn = g('inpTimeIn').value;
+    if (g('inpTimeOut')) draft.timeOut = g('inpTimeOut').value;
+    if (g('inpNote')) draft.note = g('inpNote').value;
+    if (g('inpLeaveFrom')) draft.leaveFrom = g('inpLeaveFrom').value;
+    if (g('inpLeaveTo')) draft.leaveTo = g('inpLeaveTo').value;
+  }
+
+  function isHHMM(t) { return /^([01]\d|2[0-3]):[0-5]\d$/.test(t || ''); }
+
+  function entryValidation() {
+    captureDraft();
+    const missing = [];
+    let total;
+    if (editingType === 'ot') {
+      total = 4;
+      const okIn = isHHMM(draft.timeIn), okOut = isHHMM(draft.timeOut);
+      if (!okIn) missing.push('เวลาเข้างาน');
+      if (!okOut) missing.push('เวลาเลิกงาน');
+      else if (okIn && calcWorkHours(draft.timeIn, draft.timeOut) <= 0) missing.push('เวลาเลิกต้องหลังเวลาเข้า');
+      else if (okIn && calcHours(draft.timeIn, draft.timeOut) <= 0) missing.push('ต้องทำงานเกิน 9 ชม. (รวมพัก) จึงจะมี OT');
+      if (!(draft.note || '').trim()) missing.push('หมายเหตุ');
+      if (!currentPhoto) missing.push('รูปถ่าย');
+    } else {
+      total = 2;
+      if (!draft.leaveFrom) missing.push('วันที่เริ่มลา');
+      if (!draft.leaveTo) missing.push('ถึงวันที่');
+      else if (draft.leaveFrom && draft.leaveTo < draft.leaveFrom) missing.push('วันสิ้นสุดต้องไม่ก่อนวันเริ่ม');
+    }
+    return { ok: missing.length === 0, missing, total, done: Math.max(0, total - missing.length) };
+  }
+
+  function refreshSaveState() {
+    const btn = document.getElementById('btnSaveEntry');
+    const pg = document.getElementById('entryProgress');
+    if (!btn) return;
+    const v = entryValidation();
+    const pv = document.getElementById('otPreview');
+    if (pv && editingType === 'ot') {
+      if (!isHHMM(draft.timeIn) || !isHHMM(draft.timeOut)) {
+        pv.innerHTML = '⏱️ กรอกเวลาเข้า–เลิกงาน ระบบจะหักพัก 1 ชม. และนับ OT เมื่อทำงานเกิน 8 ชม. (รวมพัก = 9 ชม.)';
+      } else {
+        const w = calcWorkHours(draft.timeIn, draft.timeOut);
+        const ot = calcHours(draft.timeIn, draft.timeOut);
+        pv.innerHTML = `ทำงานรวม <b>${fmtH(w)}</b> ชม. − เวลาปกติ 9 ชม. (8 + พัก 1) = OT <b style="color:${ot > 0 ? '#4f46e5' : '#e11d48'}">${fmtH(ot)} ชม.</b>`;
+      }
+    }
+    btn.disabled = !v.ok || savingEntry;
+    if (pg) {
+      pg.textContent = v.ok ? 'กรอกครบแล้ว ✓ พร้อมส่งคำขอ' : `กรอกแล้ว ${v.done}/${v.total} · ยังขาด: ${v.missing.join(', ')}`;
+      pg.style.color = v.ok ? '#0d9488' : '#e11d48';
+    }
+  }
+
+  function dropPendingDuplicates(empId, type, from) {
+    const removed = state.teamRequests.filter(r => (r.empId || '').toUpperCase() === empId && r.type === type && r.from === from && r.status !== 'approved');
+    removed.forEach(r => {
+      deletedRequestIds.add(r.id);
+      if (window.cloudStore) window.cloudStore.deleteRequest(r.id);
+    });
+    state.teamRequests = state.teamRequests.filter(r => !removed.includes(r));
+  }
+
+  async function saveCurrentEntry() {
+    if (!state.user || isManager() || savingEntry) return;
+    const empId = state.user.empId.trim().toUpperCase();
+    captureDraft();
+    const v = entryValidation();
+    if (!v.ok) { showToast('กรุณากรอกให้ครบ: ' + v.missing.join(', ')); refreshSaveState(); return; }
+
+    const isOt = editingType === 'ot';
+    const key = isOt ? editingDateKey : draft.leaveFrom;
+    const approved = state.teamRequests.find(r => (r.empId || '').toUpperCase() === empId && r.type === (isOt ? 'ot' : 'leave') && r.from === key && r.status === 'approved');
+    if (approved) { showToast('วันนี้ได้รับอนุมัติแล้ว แก้ไขหรือส่งซ้ำไม่ได้'); return; }
+
+    savingEntry = true;
+    refreshSaveState();
+    try {
+      if (!registeredAccounts[empId] && !deletedAccountIds.has(empId)) {
+        registeredAccounts[empId] = {
+          empId,
+          firstName: state.user.firstName || `พนักงาน ${empId}`,
+          lastName: state.user.lastName || '',
+          pwHash: state.user.pwHash || '',
+          mood: state.user.mood || 'happy',
+          avatarPhoto: state.user.avatarPhoto || '',
+          updatedAt: Date.now()
+        };
+      }
+      const rid = (t) => `req-${empId}-${key}-${t}-${Date.now()}`;
+      let calItem, reqObj, msg;
+
+      if (isOt) {
+        const timeIn = draft.timeIn, timeOut = draft.timeOut, note = draft.note.trim();
+        const hours = calcHours(timeIn, timeOut);
+        calItem = {
+          dateKey: editingDateKey, empId, firstName: state.user.firstName, lastName: state.user.lastName,
+          type: 'ot', timeIn, timeOut, note, mood: editingMood, photo: currentPhoto,
+          checkoutTime: currentCheckoutTime, checkoutLocation: currentCheckoutLocation, updatedAt: Date.now()
+        };
+        reqObj = {
+          id: rid('ot'), firstName: state.user.firstName, lastName: state.user.lastName, empId, approverId: APPROVER_ID,
+          type: 'ot', from: editingDateKey, to: editingDateKey, timeIn, timeOut, hours, workHours: calcWorkHours(timeIn, timeOut), note, mood: editingMood,
+          photo: currentPhoto, checkoutTime: currentCheckoutTime, checkoutLocation: currentCheckoutLocation,
+          updatedAt: Date.now(), status: 'submitted'
+        };
+        dropPendingDuplicates(empId, 'ot', editingDateKey);
+        msg = `ส่งคำขอทำโอที +${fmtH(hours)} ชม. ไปที่ SM2080797 แล้ว`;
+      } else {
+        const from = draft.leaveFrom, to = draft.leaveTo, note = (draft.note || '').trim() || 'ลาพักร้อน';
+        const prev = state.items[editingDateKey];
+        if (prev && prev.type === 'leave' && from !== editingDateKey) {
+          dropPendingDuplicates(empId, 'leave', editingDateKey);
+          allCloudCalendarItems = allCloudCalendarItems.filter(c => !((c.empId || '').toUpperCase() === empId && c.dateKey === editingDateKey));
+          if (window.cloudStore) window.cloudStore.deleteCalendarItem(empId, editingDateKey);
+        }
+        calItem = {
+          dateKey: from, to, empId, firstName: state.user.firstName, lastName: state.user.lastName,
+          type: 'leave', note, mood: editingMood, updatedAt: Date.now()
+        };
+        reqObj = {
+          id: rid('leave'), firstName: state.user.firstName, lastName: state.user.lastName, empId, approverId: APPROVER_ID,
+          type: 'leave', from, to, hours: 0, note, mood: editingMood, updatedAt: Date.now(), status: 'submitted'
+        };
+        dropPendingDuplicates(empId, 'leave', from);
+        msg = `ส่งคำขอลาพักร้อน (${formatThaiShort(from)} – ${formatThaiShort(to)}) ไปที่ SM2080797 แล้ว`;
+      }
+
+      allCloudCalendarItems = allCloudCalendarItems.filter(c => !((c.empId || '').toUpperCase() === empId && c.dateKey === calItem.dateKey));
+      allCloudCalendarItems.push(calItem);
+      state.teamRequests.unshift(reqObj);
+
+      window.persistLocalDatabase();
+      rebuildVisibleCalendarItems();
+      closeDaySheet();
+      renderApp();
+      showToast(msg);
+
+      if (window.cloudStore) {
+        await Promise.all([
+          window.cloudStore.saveAccount(registeredAccounts[empId]),
+          window.cloudStore.saveCalendarItem(calItem),
+          window.cloudStore.saveRequest(reqObj)
+        ]);
+      }
+    } finally {
+      savingEntry = false;
+    }
+  }
+
+  // =========================================================================
+  // Summary Tab & Excel Export
+  // =========================================================================
+  function renderSummaryTab() {
+    const manager = isManager();
+    const myId = (state.user?.empId || '').trim().toUpperCase();
+
+    if (manager) {
+      const totalTeamOt = state.teamRequests
+        .filter(r => r.type === 'ot' && r.status !== 'rejected')
+        .reduce((acc, r) => acc + otHoursOf(r), 0);
+      const approvedCount = state.teamRequests.filter(r => r.status === 'approved').length;
+      const empList = Object.values(registeredAccounts).filter(a => (a.empId || '').toUpperCase() !== APPROVER_ID);
+
+      return `
+        <div class="grid grid-cols-2 gap-2.5 mb-3">
+          <div class="comic-card p-3.5 bg-[#ffe6d3]">
+            <div class="text-lg">⚡</div>
+            <div class="text-xs font-bold mt-1">OT ทีมสะสมทั้งหมด</div>
+            <div class="text-2xl font-bold mt-1">${Math.round(totalTeamOt * 10) / 10} ชม.</div>
+            <div class="text-[11px] text-[#7a76a3] mt-0.5">จากคำขอ OT ${state.teamRequests.filter(r => r.type === 'ot').length} รายการ</div>
+          </div>
+          <div class="comic-card p-3.5 bg-[#c6f3dc]">
+            <div class="text-lg">👥</div>
+            <div class="text-xs font-bold mt-1">พนักงานในระบบ</div>
+            <div class="text-2xl font-bold mt-1">${empList.length} คน</div>
+            <div class="text-[11px] text-[#7a76a3] mt-0.5">อนุมัติแล้ว ${approvedCount} รายการ</div>
+          </div>
+        </div>
+
+        <div class="comic-card p-3.5 mb-3 flex items-center justify-between gap-2">
+          <div>
+            <div class="text-xs font-bold">📊 รายงาน OT พนักงานทุกคน</div>
+            <div class="text-[11px] text-[#7a76a3]">ไฟล์ .xlsx หลายชีต: สรุปภาพรวม · รายสัปดาห์ · รายเดือน · รายปี · อันดับคนขอ OT · รายการทั้งหมด</div>
+          </div>
+          <button type="button" onclick="exportTeamExcel()" class="comic-btn px-3.5 py-2 bg-[#c6f3dc] text-xs shrink-0">📥 โหลด Excel</button>
+        </div>
+
+        <div class="comic-card p-3.5 mb-3">
+          <div class="flex items-center justify-between mb-2.5">
+            <h3 class="text-sm font-bold">⏳ รายการรออนุมัติทั้งหมด (${state.teamRequests.filter(r => r.status === 'submitted').length})</h3>
+            <button type="button" onclick="switchTab('app')" class="text-[11px] font-bold text-[#5b4ce6] underline">เปิดหน้าอนุมัติ →</button>
+          </div>
+          ${state.teamRequests.filter(r => r.status === 'submitted').length === 0 ? `
+            <p class="text-xs text-[#7a76a3] text-center py-2">ไม่มีรายการค้างรออนุมัติ</p>
+          ` : `
+            <div class="space-y-2">
+              ${state.teamRequests.filter(r => r.status === 'submitted').map(r => `
+                <div class="p-2.5 rounded-2xl border-2 border-[#1e1b4b] bg-[#fffaf5] flex items-center justify-between gap-2">
+                  <div class="min-w-0">
+                    <div class="text-xs font-bold truncate">${r.firstName} ${r.lastName} <span class="text-[10px] px-1.5 py-0.2 rounded-full bg-white border border-[#1e1b4b]">${r.empId}</span></div>
+                    <div class="text-[11px] font-semibold text-[#5b4ce6] mt-0.5">
+                      ${r.type === 'ot' ? `⚡ OT +${fmtH(otHoursOf(r))} ชม. (${formatThaiShort(r.from)})` : `🌴 ลาพักร้อน (${formatThaiShort(r.from)} – ${formatThaiShort(r.to)})`}
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-1.5 shrink-0">
+                    <button type="button" onclick="decideRequest('${r.id}', 'rejected')" class="px-2.5 py-1.5 rounded-full bg-[#ffd6e0] border border-[#1e1b4b] text-[11px] font-bold">✕</button>
+                    <button type="button" onclick="decideRequest('${r.id}', 'approved')" class="px-2.5 py-1.5 rounded-full bg-[#c6f3dc] border border-[#1e1b4b] text-[11px] font-bold">✓ อนุมัติ</button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          `}
+        </div>
+
+        <div class="comic-card p-3.5">
+          <div class="flex items-center justify-between mb-2.5">
+            <h3 class="text-sm font-bold">สรุป OT แยกรายบุคคล</h3>
+            <span class="text-xs text-[#7a76a3]">${empList.length} คน</span>
+          </div>
+          <div class="space-y-2">
+            ${empList.length === 0 ? `<p class="text-xs text-[#7a76a3] text-center py-3">ยังไม่มีพนักงานในระบบ</p>` : empList.map(emp => {
+              const id = emp.empId.toUpperCase();
+              const empReqs = state.teamRequests.filter(r => (r.empId || '').toUpperCase() === id);
+              const appHrs = empReqs.filter(r => r.type === 'ot' && r.status === 'approved').reduce((s, r) => s + otHoursOf(r), 0);
+              const pendHrs = empReqs.filter(r => r.type === 'ot' && r.status === 'submitted').reduce((s, r) => s + otHoursOf(r), 0);
+              const leaveDays = empReqs.filter(r => r.type === 'leave' && r.status !== 'rejected').reduce((s, r) => {
+                const d1 = new Date(r.from + 'T00:00:00');
+                const d2 = new Date((r.to || r.from) + 'T00:00:00');
+                return s + Math.max(1, Math.round((d2 - d1) / 86400000) + 1);
+              }, 0);
+              return `
+                <div class="p-3 rounded-2xl border-2 border-[#1e1b4b] bg-[#f6f5ff] flex items-center justify-between">
+                  <div>
+                    <div class="text-xs font-bold">${emp.firstName} ${emp.lastName || ''} <span class="px-2 py-0.5 rounded-full bg-white border border-[#1e1b4b] text-[10px]">${id}</span></div>
+                    <div class="text-[11px] text-[#7a76a3] mt-0.5">อนุมัติ ${appHrs} ชม. · รออนุมัติ ${pendHrs} ชม. · ลา ${leaveDays} วัน</div>
+                  </div>
+                  <div class="text-sm font-bold text-[#4f46e5]">+${appHrs + pendHrs} ชม.</div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    const myReqs = state.teamRequests.filter(r => (r.empId || '').toUpperCase() === myId);
+    const myOtHrs = myReqs.filter(r => r.type === 'ot' && r.status !== 'rejected').reduce((s, r) => s + otHoursOf(r), 0);
+    const myLeaveDays = myReqs.filter(r => r.type === 'leave' && r.status !== 'rejected').reduce((s, r) => {
+      const d1 = new Date(r.from + 'T00:00:00');
+      const d2 = new Date((r.to || r.from) + 'T00:00:00');
+      return s + Math.max(1, Math.round((d2 - d1) / 86400000) + 1);
+    }, 0);
+
+    return `
+      <div class="grid grid-cols-2 gap-2.5 mb-3">
+        <div class="comic-card p-3.5 bg-[#ffe6d3]">
+          <div class="text-lg">⚡</div>
+          <div class="text-xs font-bold mt-1">OT สะสมของฉัน</div>
+          <div class="text-2xl font-bold mt-1">${myOtHrs} ชม.</div>
+          <div class="text-[11px] text-[#7a76a3] mt-0.5">รหัสพนักงาน ${myId}</div>
+        </div>
+        <div class="comic-card p-3.5 bg-[#c6f3dc]">
+          <div class="text-lg">🌴</div>
+          <div class="text-xs font-bold mt-1">วันลาพักร้อนของฉัน</div>
+          <div class="text-2xl font-bold mt-1">${myLeaveDays} วัน</div>
+          <div class="text-[11px] text-[#7a76a3] mt-0.5">คำนวณตามช่วงวันที่ขอลา</div>
+        </div>
+      </div>
+
+      <div class="comic-card p-3.5">
+        <h3 class="text-sm font-bold mb-2.5">ประวัติคำขอของฉัน (${myId})</h3>
+        <div class="space-y-2">
+          ${myReqs.length === 0 ? `<p class="text-xs text-[#7a76a3] text-center py-4">ยังไม่มีประวัติคำขอ OT หรือวันลา</p>` : myReqs.map(r => `
+            <div class="p-3 rounded-2xl border-2 border-[#1e1b4b] bg-[#f6f5ff] flex items-center justify-between gap-2">
+              <div>
+                <div class="text-xs font-bold">
+                  ${r.type === 'ot' ? `⚡ ขอทำโอที +${fmtH(otHoursOf(r))} ชม. (${formatThaiShort(r.from)})` : `🌴 ลาพักร้อน (${formatThaiShort(r.from)} – ${formatThaiShort(r.to)})`}
+                </div>
+                <div class="text-[11px] text-[#7a76a3] mt-0.5">${r.note || ''}</div>
+              </div>
+              <span class="px-2.5 py-1 rounded-full border border-[#1e1b4b] text-[10px] font-bold shrink-0 ${
+                r.status === 'approved' ? 'bg-[#c6f3dc]' : r.status === 'rejected' ? 'bg-[#ffd6e0]' : 'bg-[#ffe6d3]'
+              }">
+                ${r.status === 'approved' ? '✓ อนุมัติแล้ว' : r.status === 'rejected' ? '✕ ไม่อนุมัติ' : '⏳ รออนุมัติ'}
+              </span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  function exportTeamCsvFallback() {
+    let csv = '\uFEFFรหัสพนักงาน,ชื่อ-นามสกุล,ประเภท,วันที่เริ่ม,ถึงวันที่,เวลาเริ่ม,เวลาเลิก,ชั่วโมง OT,หมายเหตุ,สถานะ\n';
+    state.teamRequests.forEach(r => {
+      const statusText = r.status === 'approved' ? 'อนุมัติแล้ว' : r.status === 'rejected' ? 'ไม่อนุมัติ' : 'รออนุมัติ';
+      csv += `"${r.empId}","${r.firstName} ${r.lastName || ''}","${r.type === 'ot' ? 'OT' : 'ลาพักร้อน'}","${r.from}","${r.to || r.from}","${r.timeIn || '-'}","${r.timeOut || '-'}","${otHoursOf(r)}","${(r.note || '').replace(/"/g, '""')}","${statusText}"\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `oto-report-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('📥 ดาวน์โหลดไฟล์ CSV เรียบร้อย');
+  }
+
+  // =========================================================================
+  // Excel export (.xlsx) — สรุปรายสัปดาห์ / รายเดือน / รายปี / อันดับคนขอ OT
+  // =========================================================================
+  let _exceljsPromise = null;
+  function loadExcelJS() {
+    if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
+    if (_exceljsPromise) return _exceljsPromise;
+    _exceljsPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+      s.onload = () => (window.ExcelJS ? resolve(window.ExcelJS) : reject(new Error('ExcelJS missing')));
+      s.onerror = () => { _exceljsPromise = null; reject(new Error('ExcelJS load failed')); };
+      document.head.appendChild(s);
+    });
+    return _exceljsPromise;
+  }
+
+  function dkToDate(k) { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); }
+  function dkToUtc(k) { const [y, m, d] = k.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); }
+  function fmtThaiDate(dt) { return `${dt.getDate()} ${THAI_MONTHS_SHORT[dt.getMonth()]} ${dt.getFullYear() + 543}`; }
+  function isoWeekInfo(dk) {
+    const d = dkToDate(dk);
+    const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+    const thu = new Date(mon); thu.setDate(mon.getDate() + 3);
+    const isoYear = thu.getFullYear();
+    const jan4 = new Date(isoYear, 0, 4);
+    const w1 = new Date(jan4); w1.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
+    const week = Math.round((mon - w1) / (7 * 86400000)) + 1;
+    return { key: `${isoYear}-W${String(week).padStart(2, '0')}`, isoYear, week, mon, sun };
+  }
+
+  function buildOtWorkbook(ExcelJS) {
+    const FONT = 'Tahoma';
+    const C = { ink: 'FF1E1B4B', accent: 'FF5B4CE6', peach: 'FFFFE6D3', mint: 'FFC6F3DC', lav: 'FFE5E2FF', rose: 'FFFFD6E0', paper: 'FFF6F5FF', white: 'FFFFFFFF', muted: 'FF7A76A3', orange: 'FFFF8A4C', grey: 'FF9E9BC2' };
+    const thin = { style: 'thin', color: { argb: 'FFC7C3EA' } };
+    const border = { top: thin, left: thin, bottom: thin, right: thin };
+    const solid = (argb) => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
+    const r2 = (n) => Math.round(n * 100) / 100;
+    const empOf = (r) => (r.empId || '').trim().toUpperCase();
+    const nameOf = (r) => `${r.firstName || ''} ${r.lastName || ''}`.trim() || empOf(r);
+    const bar = (v, max) => (max > 0 && v > 0 ? '█'.repeat(Math.max(1, Math.round((v / max) * 18))) : '');
+    const NUM = '#,##0.0#', NUM_DASH = '#,##0.0#;-#,##0.0#;"-"';
+
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'oto';
+    wb.created = new Date();
+
+    const now = new Date();
+    const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const todayMonth = todayKey.slice(0, 7), todayYear = todayKey.slice(0, 4), todayWeek = isoWeekInfo(todayKey).key;
+
+    // ----- ข้อมูลตั้งต้น: OT ที่ไม่ถูกปฏิเสธ -----
+    const otRows = state.teamRequests
+      .filter(r => r.type === 'ot' && r.status !== 'rejected' && r.from)
+      .map(r => ({ r, emp: empOf(r), name: nameOf(r), dk: r.from, hrs: otHoursOf(r), appr: r.status === 'approved' }))
+      .filter(x => x.hrs > 0);
+    const leaveReqs = state.teamRequests.filter(r => r.type === 'leave' && r.status !== 'rejected' && r.from);
+    const leaveDaysOf = (r) => Math.max(1, Math.round((dkToDate(r.to || r.from) - dkToDate(r.from)) / 86400000) + 1);
+
+    const totalHrs = otRows.reduce((s, x) => s + x.hrs, 0);
+    const apprHrs = otRows.filter(x => x.appr).reduce((s, x) => s + x.hrs, 0);
+    const maxPersonDay = new Set(otRows.map(x => x.emp + '|' + x.dk)).size;
+
+    function aggregate(keyFn) {
+      const m = new Map();
+      otRows.forEach(x => {
+        const k = keyFn(x);
+        let g = m.get(k);
+        if (!g) { g = { key: k, hrs: 0, appr: 0, days: new Set(), people: new Map() }; m.set(k, g); }
+        g.hrs += x.hrs;
+        if (x.appr) g.appr += x.hrs;
+        g.days.add(x.emp + '|' + x.dk);
+        const p = g.people.get(x.emp) || { name: x.name, hrs: 0 };
+        p.hrs += x.hrs;
+        g.people.set(x.emp, p);
+      });
+      return [...m.values()].sort((a, b) => (a.key < b.key ? -1 : 1));
+    }
+    const topOf = (g) => [...g.people.values()].sort((a, b) => b.hrs - a.hrs);
+
+    // ----- helper จัดหน้า -----
+    function newSheet(title, tab, widths) {
+      const ws = wb.addWorksheet(title, { properties: { tabColor: { argb: tab } }, views: [{ showGridLines: false }] });
+      ws.columns = widths.map(w => ({ width: w }));
+      return ws;
+    }
+    function titleBlock(ws, text, sub, span) {
+      ws.mergeCells(1, 1, 1, span);
+      const c = ws.getCell(1, 1);
+      c.value = text;
+      c.font = { name: FONT, size: 16, bold: true, color: { argb: C.white } };
+      c.fill = solid(C.ink);
+      c.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+      ws.getRow(1).height = 34;
+      ws.mergeCells(2, 1, 2, span);
+      const s = ws.getCell(2, 1);
+      s.value = sub;
+      s.font = { name: FONT, size: 10, color: { argb: C.muted } };
+      s.alignment = { vertical: 'middle', horizontal: 'left', indent: 1, wrapText: true };
+      ws.getRow(2).height = 30;
+    }
+    function headerRow(ws, rowNum, labels, fill) {
+      const row = ws.getRow(rowNum);
+      labels.forEach((l, i) => {
+        const c = row.getCell(i + 1);
+        c.value = l;
+        c.font = { name: FONT, size: 11, bold: true, color: { argb: C.white } };
+        c.fill = solid(fill || C.accent);
+        c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        c.border = border;
+      });
+      row.height = 28;
+    }
+    // fmts: n=ทศนิยม, i=จำนวนเต็ม, c=กึ่งกลาง, b=แท่งกราฟ, d=ตัวเลขแสดง - เมื่อเป็น 0, t=ข้อความ
+    function bodyRow(ws, rowNum, values, fmts, opts = {}) {
+      const row = ws.getRow(rowNum);
+      values.forEach((v, i) => {
+        const c = row.getCell(i + 1);
+        c.value = v;
+        c.border = border;
+        c.font = { name: FONT, size: 11, bold: !!opts.bold, color: { argb: opts.color || C.ink } };
+        const f = fmts[i] || 't';
+        if (f === 'n') { c.numFmt = NUM; c.alignment = { horizontal: 'right', vertical: 'middle' }; }
+        else if (f === 'd') { c.numFmt = NUM_DASH; c.alignment = { horizontal: 'right', vertical: 'middle' }; }
+        else if (f === 'i') { c.numFmt = '#,##0'; c.alignment = { horizontal: 'right', vertical: 'middle' }; }
+        else if (f === 'c') { c.alignment = { horizontal: 'center', vertical: 'middle' }; }
+        else if (f === 'b') { c.font = { name: FONT, size: 11, color: { argb: C.orange } }; c.alignment = { horizontal: 'left', vertical: 'middle' }; }
+        else { c.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true }; }
+        if (opts.fill) c.fill = solid(opts.fill);
+        else if (opts.zebra) c.fill = solid(C.paper);
+      });
+      row.height = opts.height || 21;
+    }
+    function noteRow(ws, rowNum, text, span) {
+      ws.mergeCells(rowNum, 1, rowNum, span);
+      const c = ws.getCell(rowNum, 1);
+      c.value = text;
+      c.font = { name: FONT, size: 10, italic: true, color: { argb: C.muted } };
+      c.alignment = { vertical: 'middle', horizontal: 'left', indent: 1, wrapText: true };
+    }
+
+    const RULE = 'OT = เวลาทำงานรวม − 9 ชม. (ทำงาน 8 ชม. + พัก 1 ชม.) · นับเฉพาะคำขอที่ไม่ถูกปฏิเสธ (อนุมัติแล้ว + รออนุมัติ)';
+    const stamp = `ออกรายงานเมื่อ ${fmtThaiDate(now)} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} น.`;
+
+    // =====================================================================
+    // 1) สรุปภาพรวม
+    // =====================================================================
+    {
+      const ws = newSheet('สรุปภาพรวม', 'FF5B4CE6', [38, 18, 18, 16, 30]);
+      titleBlock(ws, '⚡ รายงานสรุป OT ทีม', `${stamp}\n${RULE}`, 5);
+      const byMonth = aggregate(x => x.dk.slice(0, 7));
+      const byWeek = aggregate(x => isoWeekInfo(x.dk).key);
+      const byYear = aggregate(x => x.dk.slice(0, 4));
+      const pick = (arr, k) => (arr.find(g => g.key === k)?.hrs) || 0;
+      const peak = [...byMonth].sort((a, b) => b.hrs - a.hrs)[0];
+      const peakLabel = peak ? `${THAI_MONTHS[Number(peak.key.slice(5)) - 1]} ${Number(peak.key.slice(0, 4)) + 543} (${r2(peak.hrs)} ชม.)` : '-';
+      const empCount = new Set(otRows.map(x => x.emp)).size;
+      const kpis = [
+        ['OT รวมทั้งหมด (ชม.)', r2(totalHrs), C.peach, 'n'],
+        ['  └ อนุมัติแล้ว (ชม.)', r2(apprHrs), C.mint, 'n'],
+        ['  └ รออนุมัติ (ชม.)', r2(totalHrs - apprHrs), C.peach, 'n'],
+        ['OT สัปดาห์นี้ (ชม.)', r2(pick(byWeek, todayWeek)), C.lav, 'n'],
+        ['OT เดือนนี้ (ชม.)', r2(pick(byMonth, todayMonth)), C.lav, 'n'],
+        ['OT ปีนี้ (ชม.)', r2(pick(byYear, todayYear)), C.lav, 'n'],
+        ['เดือนที่ OT สูงสุด', peakLabel, C.lav, 't'],
+        ['จำนวนวันที่มี OT (คน-วัน)', maxPersonDay, C.white, 'i'],
+        ['จำนวนพนักงานที่ขอ OT (คน)', empCount, C.white, 'i'],
+        ['OT เฉลี่ยต่อคน (ชม.)', empCount ? r2(totalHrs / empCount) : 0, C.white, 'n'],
+        ['วันลาพักร้อนรวม (วัน)', leaveReqs.reduce((s, r) => s + leaveDaysOf(r), 0), C.mint, 'i']
+      ];
+      headerRow(ws, 4, ['ตัวชี้วัด', 'ค่า'], C.ink);
+      kpis.forEach((k, i) => {
+        bodyRow(ws, 5 + i, [k[0], k[1]], ['t', k[3]], { fill: k[2], bold: i === 0 });
+        ws.getCell(5 + i, 2).alignment = { horizontal: 'right', vertical: 'middle' };
+      });
+
+      let row = 5 + kpis.length + 2;
+      ws.mergeCells(row, 1, row, 5);
+      const h = ws.getCell(row, 1);
+      h.value = '🏆 ใครขอ OT เยอะที่สุด (Top 5)';
+      h.font = { name: FONT, size: 13, bold: true, color: { argb: C.ink } };
+      row += 1;
+      headerRow(ws, row, ['ชื่อ (รหัส)', 'OT รวม (ชม.)', 'อนุมัติแล้ว (ชม.)', '% ของทีม', 'กราฟ'], C.accent);
+      const people = new Map();
+      otRows.forEach(x => {
+        const p = people.get(x.emp) || { name: x.name, hrs: 0, appr: 0 };
+        p.hrs += x.hrs; if (x.appr) p.appr += x.hrs;
+        people.set(x.emp, p);
+      });
+      const ranked = [...people.entries()].sort((a, b) => b[1].hrs - a[1].hrs).slice(0, 5);
+      if (!ranked.length) {
+        bodyRow(ws, row + 1, ['ยังไม่มีข้อมูล OT', '', '', '', ''], ['t', 't', 't', 't', 't']);
+      }
+      ranked.forEach(([id, p], i) => {
+        bodyRow(ws, row + 1 + i, [`${i + 1}. ${p.name} (${id})`, r2(p.hrs), r2(p.appr), totalHrs ? p.hrs / totalHrs : 0, bar(p.hrs, ranked[0][1].hrs)], ['t', 'n', 'n', 'c', 'b'], { zebra: i % 2 === 1 });
+        ws.getCell(row + 1 + i, 4).numFmt = '0.0%';
+      });
+    }
+
+    // =====================================================================
+    // 2-4) ตารางสรุปตามช่วงเวลา (รายเดือน / รายสัปดาห์ / รายปี)
+    // =====================================================================
+    function periodSheet(title, tab, headline, firstHeads, groups, labelFn, extraNote) {
+      const nFirst = firstHeads.length;
+      const widths = [...firstHeads.map((h, i) => (i === 0 ? 24 : 26)), 14, 14, 14, 12, 24, 14, 62, 24];
+      const ws = newSheet(title, tab, widths);
+      const span = nFirst + 8;
+      titleBlock(ws, headline, `${stamp}\n${RULE}`, span);
+      headerRow(ws, 4, [...firstHeads, 'OT รวม (ชม.)', 'อนุมัติแล้ว (ชม.)', 'จำนวนวัน (คน-วัน)', 'จำนวนคน', 'ขอเยอะสุด', 'ชม. ของคนนั้น', 'Top 3', 'กราฟ'], C.accent);
+      ws.views = [{ state: 'frozen', ySplit: 4, showGridLines: false }];
+      const maxHrs = Math.max(0, ...groups.map(g => g.hrs));
+      let r = 5;
+      groups.forEach((g, i) => {
+        const top = topOf(g);
+        const top3 = top.slice(0, 3).map((p, j) => `${j + 1}. ${p.name} (${r2(p.hrs)})`).join('   ');
+        const isPeak = g.hrs === maxHrs && maxHrs > 0;
+        bodyRow(ws, r, [...labelFn(g), r2(g.hrs), r2(g.appr), g.days.size, g.people.size, top[0].name, r2(top[0].hrs), top3, bar(g.hrs, maxHrs)],
+          [...firstHeads.map(() => 't'), 'n', 'n', 'i', 'i', 't', 'n', 't', 'b'], { fill: isPeak ? C.peach : undefined, zebra: !isPeak && i % 2 === 1 });
+        r += 1;
+      });
+      if (!groups.length) { bodyRow(ws, r, [...firstHeads.map((_, i) => (i === 0 ? 'ยังไม่มีข้อมูล OT' : '')), '', '', '', '', '', '', '', ''], [...firstHeads.map(() => 't'), 't', 't', 't', 't', 't', 't', 't', 't']); r += 1; }
+      else {
+        const peopleAll = new Set(otRows.map(x => x.emp)).size;
+        const topAll = [...new Map(otRows.map(x => [x.emp, 0])).keys()].map(id => ({ id, name: otRows.find(x => x.emp === id).name, hrs: otRows.filter(x => x.emp === id).reduce((s, x) => s + x.hrs, 0) })).sort((a, b) => b.hrs - a.hrs)[0];
+        bodyRow(ws, r, [...firstHeads.map((_, i) => (i === 0 ? 'รวมทั้งหมด' : '')), r2(totalHrs), r2(apprHrs), maxPersonDay, peopleAll, topAll.name, r2(topAll.hrs), '', ''],
+          [...firstHeads.map(() => 't'), 'n', 'n', 'i', 'i', 't', 'n', 't', 't'], { fill: C.lav, bold: true, height: 24 });
+        r += 1;
+      }
+      noteRow(ws, r + 1, extraNote || 'แถวสีส้ม = ช่วงที่มี OT สูงสุด · "จำนวนวัน (คน-วัน)" = นับ 1 คนที่ทำ OT 1 วัน เป็น 1', span);
+      ws.getRow(r + 1).height = 22;
+      return ws;
+    }
+
+    const monthLabel = (k) => `${THAI_MONTHS[Number(k.slice(5)) - 1]} ${Number(k.slice(0, 4)) + 543}`;
+    periodSheet('รายเดือน', 'FFFFB98A', '📅 สรุป OT รายเดือน', ['เดือน'], aggregate(x => x.dk.slice(0, 7)), (g) => [monthLabel(g.key)]);
+
+    periodSheet('รายสัปดาห์', 'FFD9F0FF', '🗓️ สรุป OT รายสัปดาห์ (จันทร์–อาทิตย์)', ['สัปดาห์', 'ช่วงวันที่'], aggregate(x => isoWeekInfo(x.dk).key), (g) => {
+      const wi = isoWeekInfo(`${g.key.slice(0, 4)}-01-04`);
+      // หาวันจันทร์ของสัปดาห์จากรหัส ISO
+      const mon = new Date(wi.mon); mon.setDate(mon.getDate() + (Number(g.key.slice(6)) - 1) * 7);
+      const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+      return [`สัปดาห์ที่ ${Number(g.key.slice(6))}/${Number(g.key.slice(0, 4)) + 543}`, `${fmtThaiDate(mon)} – ${fmtThaiDate(sun)}`];
+    });
+
+    {
+      const years = aggregate(x => x.dk.slice(0, 4));
+      const monthsInYear = (y) => new Set(otRows.filter(x => x.dk.startsWith(y)).map(x => x.dk.slice(0, 7))).size;
+      const ws = periodSheet('รายปี', 'FFC6F3DC', '📆 สรุป OT รายปี', ['ปี (พ.ศ.)', 'OT เฉลี่ยต่อเดือน (ชม.)'], years, (g) => [Number(g.key) + 543, r2(g.hrs / Math.max(1, monthsInYear(g.key)))]);
+      years.forEach((g, i) => { const c = ws.getCell(5 + i, 2); c.numFmt = NUM; c.alignment = { horizontal: 'right', vertical: 'middle' }; ws.getCell(5 + i, 1).alignment = { horizontal: 'center', vertical: 'middle' }; });
+    }
+
+    // =====================================================================
+    // 5) อันดับคนขอ OT
+    // =====================================================================
+    {
+      const ws = newSheet('อันดับคนขอ OT', 'FFFFD6E0', [9, 14, 28, 14, 14, 14, 14, 14, 12, 14, 26]);
+      titleBlock(ws, '🏆 อันดับพนักงานที่ขอ OT', `${stamp}\n${RULE}`, 11);
+      headerRow(ws, 4, ['อันดับ', 'รหัส', 'ชื่อ', 'OT รวม (ชม.)', 'อนุมัติแล้ว (ชม.)', 'รออนุมัติ (ชม.)', 'จำนวนวัน', 'เฉลี่ย/วัน (ชม.)', '% ของทีม', 'ลาพักร้อน (วัน)', 'กราฟ'], C.accent);
+      ws.views = [{ state: 'frozen', ySplit: 4, showGridLines: false }];
+      const map = new Map();
+      Object.values(registeredAccounts).forEach(a => {
+        const id = (a.empId || '').toUpperCase();
+        if (!id || id === APPROVER_ID) return;
+        map.set(id, { id, name: `${a.firstName || ''} ${a.lastName || ''}`.trim() || id, hrs: 0, appr: 0, days: new Set(), leave: 0 });
+      });
+      const ensure = (id, name) => { if (!map.has(id)) map.set(id, { id, name, hrs: 0, appr: 0, days: new Set(), leave: 0 }); return map.get(id); };
+      otRows.forEach(x => { const p = ensure(x.emp, x.name); p.hrs += x.hrs; if (x.appr) p.appr += x.hrs; p.days.add(x.dk); });
+      leaveReqs.forEach(r => { const p = ensure(empOf(r), nameOf(r)); p.leave += leaveDaysOf(r); });
+      const list = [...map.values()].sort((a, b) => b.hrs - a.hrs || a.name.localeCompare(b.name));
+      const maxH = Math.max(0, ...list.map(p => p.hrs));
+      list.forEach((p, i) => {
+        const medal = p.hrs > 0 ? (i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : String(i + 1)) : '-';
+        bodyRow(ws, 5 + i, [medal, p.id, p.name, r2(p.hrs), r2(p.appr), r2(p.hrs - p.appr), p.days.size, p.days.size ? r2(p.hrs / p.days.size) : 0, totalHrs ? p.hrs / totalHrs : 0, p.leave, bar(p.hrs, maxH)],
+          ['c', 'c', 't', 'd', 'd', 'd', 'i', 'd', 'c', 'd', 'b'], { fill: i === 0 && p.hrs > 0 ? C.peach : undefined, zebra: !(i === 0 && p.hrs > 0) && i % 2 === 1 });
+        ws.getCell(5 + i, 9).numFmt = '0.0%';
+      });
+      if (!list.length) bodyRow(ws, 5, ['', '', 'ยังไม่มีพนักงานในระบบ', '', '', '', '', '', '', '', ''], ['t', 't', 't', 't', 't', 't', 't', 't', 't', 't', 't']);
+    }
+
+    // =====================================================================
+    // 6) ตารางรายคน × รายเดือน
+    // =====================================================================
+    {
+      const months = [...new Set(otRows.map(x => x.dk.slice(0, 7)))].sort();
+      const widths = [14, 26, ...months.map(() => 11), 14];
+      const ws = newSheet('รายคน-รายเดือน', 'FFE5E2FF', widths);
+      const span = 2 + months.length + 1;
+      titleBlock(ws, '👥 OT แยกรายคน × รายเดือน (ชม.)', `${stamp}\n${RULE}`, Math.max(span, 4));
+      headerRow(ws, 4, ['รหัส', 'ชื่อ', ...months.map(m => `${THAI_MONTHS_SHORT[Number(m.slice(5)) - 1]} ${String(Number(m.slice(0, 4)) + 543).slice(2)}`), 'รวม'], C.accent);
+      ws.views = [{ state: 'frozen', xSplit: 2, ySplit: 4, showGridLines: false }];
+      const ids = [...new Set(otRows.map(x => x.emp))];
+      const sumBy = (id, m) => otRows.filter(x => x.emp === id && (!m || x.dk.startsWith(m))).reduce((s, x) => s + x.hrs, 0);
+      const people = ids.map(id => ({ id, name: otRows.find(x => x.emp === id).name, total: sumBy(id) })).sort((a, b) => b.total - a.total);
+      people.forEach((p, i) => {
+        bodyRow(ws, 5 + i, [p.id, p.name, ...months.map(m => r2(sumBy(p.id, m))), r2(p.total)], ['c', 't', ...months.map(() => 'd'), 'n'], { zebra: i % 2 === 1 });
+        ws.getCell(5 + i, span).font = { name: FONT, size: 11, bold: true, color: { argb: C.ink } };
+      });
+      if (people.length) {
+        const tr = 5 + people.length;
+        bodyRow(ws, tr, ['', 'รวมทั้งทีม', ...months.map(m => r2(otRows.filter(x => x.dk.startsWith(m)).reduce((s, x) => s + x.hrs, 0))), r2(totalHrs)], ['t', 't', ...months.map(() => 'd'), 'n'], { fill: C.lav, bold: true, height: 24 });
+        if (months.length) {
+          const colL = (n) => { let s = ''; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };
+          ws.addConditionalFormatting({ ref: `C5:${colL(2 + months.length)}${4 + people.length}`, rules: [{ type: 'colorScale', cfvo: [{ type: 'min' }, { type: 'max' }], color: [{ argb: 'FFFFFFFF' }, { argb: 'FFFFB98A' }] }] });
+        }
+      } else {
+        bodyRow(ws, 5, ['', 'ยังไม่มีข้อมูล OT', '', ''].slice(0, Math.max(4, span)), [], {});
+      }
+    }
+
+    // =====================================================================
+    // 7) รายการทั้งหมด
+    // =====================================================================
+    {
+      const ws = newSheet('รายการทั้งหมด', 'FFC7C3EA', [13, 12, 12, 24, 13, 13, 10, 10, 13, 10, 12, 34, 14]);
+      titleBlock(ws, '📋 รายการ OT & ลาพักร้อน ทั้งหมด', `${stamp}\nวันที่แสดงเป็น ค.ศ. (วว/ดด/ปปปป) เพื่อให้กรองและเรียงลำดับใน Excel ได้ถูกต้อง · ใช้ปุ่มกรองที่หัวตารางได้`, 13);
+      headerRow(ws, 4, ['วันที่', 'วัน', 'รหัส', 'ชื่อ', 'ประเภท', 'ถึงวันที่', 'เข้างาน', 'เลิกงาน', 'ทำงานรวม (ชม.)', 'พัก (ชม.)', 'OT (ชม.)', 'หมายเหตุ', 'สถานะ'], C.ink);
+      ws.views = [{ state: 'frozen', ySplit: 4, showGridLines: false }];
+      const sorted = [...state.teamRequests].filter(r => r.from).sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : empOf(a) < empOf(b) ? -1 : 1));
+      sorted.forEach((r, i) => {
+        const isOt = r.type === 'ot';
+        const hasT = isOt && r.timeIn && r.timeOut;
+        const work = hasT ? calcWorkHours(r.timeIn, r.timeOut) : '';
+        const status = r.status === 'approved' ? 'อนุมัติแล้ว' : r.status === 'rejected' ? 'ไม่อนุมัติ' : 'รออนุมัติ';
+        const rowNum = 5 + i;
+        bodyRow(ws, rowNum, [dkToUtc(r.from), THAI_DAYS_FULL[dkToDate(r.from).getDay()], empOf(r), nameOf(r), isOt ? 'OT' : 'ลาพักร้อน', dkToUtc(r.to || r.from),
+          isOt ? (r.timeIn || '-') : '-', isOt ? (r.timeOut || '-') : '-', work, hasT ? BREAK_HOURS : '', isOt ? otHoursOf(r) : '', (r.note || ''), status],
+          ['c', 'c', 'c', 't', 'c', 'c', 'c', 'c', 'n', 'n', 'n', 't', 'c'], { zebra: i % 2 === 1, color: r.status === 'rejected' ? C.grey : C.ink });
+        ws.getCell(rowNum, 1).numFmt = 'dd/mm/yyyy';
+        ws.getCell(rowNum, 6).numFmt = 'dd/mm/yyyy';
+        const sc = ws.getCell(rowNum, 13);
+        sc.fill = solid(r.status === 'approved' ? C.mint : r.status === 'rejected' ? C.rose : C.peach);
+        sc.font = { name: FONT, size: 11, bold: true, color: { argb: C.ink } };
+        const oc = ws.getCell(rowNum, 11);
+        if (isOt && otHoursOf(r) > 0 && r.status !== 'rejected') oc.font = { name: FONT, size: 11, bold: true, color: { argb: 'FF5B4CE6' } };
+      });
+      if (sorted.length) ws.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4 + sorted.length, column: 13 } };
+    }
+
+    return wb;
+  }
+
+  async function exportTeamExcel() {
+    showToast('⏳ กำลังสร้างไฟล์ Excel...');
+    let ExcelJS;
+    try { ExcelJS = await loadExcelJS(); }
+    catch (e) { showToast('โหลดตัวสร้าง Excel ไม่ได้ (เน็ตหลุด?) — ดาวน์โหลดแบบ CSV แทน'); exportTeamCsvFallback(); return; }
+    try {
+      const wb = buildOtWorkbook(ExcelJS);
+      const buf = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `oto-report-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      showToast('📥 ดาวน์โหลดรายงาน Excel เรียบร้อย');
+    } catch (e) {
+      console.error(e);
+      showToast('สร้าง Excel ไม่สำเร็จ — ดาวน์โหลดแบบ CSV แทน');
+      exportTeamCsvFallback();
+    }
+  }
+
+
+  // =========================================================================
+  // Approval Queue & Details (SM2080797)
+  // =========================================================================
+  function renderApprovalTab() {
+    const pending = state.teamRequests.filter(r => r.status === 'submitted');
+    const history = state.teamRequests.filter(r => r.status !== 'submitted');
+    const list = state.approvalSubTab === 'pending' ? pending : history;
+
+    return `
+      <div class="grid grid-cols-2 gap-2 mb-3">
+        <button type="button" onclick="state.approvalSubTab='pending'; renderApp();" class="comic-pill py-2.5 text-xs font-bold ${state.approvalSubTab === 'pending' ? 'bg-[#ffb98a] text-[#1e1b4b]' : 'bg-[#1e1b4b] text-white'}">
+          ⏳ รออนุมัติ (${pending.length})
+        </button>
+        <button type="button" onclick="state.approvalSubTab='history'; renderApp();" class="comic-pill py-2.5 text-xs font-bold ${state.approvalSubTab === 'history' ? 'bg-[#c6f3dc] text-[#1e1b4b]' : 'bg-[#1e1b4b] text-white'}">
+          📜 ประวัติการอนุมัติ (${history.length})
+        </button>
+      </div>
+
+      ${list.length === 0 ? `
+        <div class="comic-card p-6 text-center">
+          <div class="mx-auto w-14 h-14 mb-2 flex items-center justify-center">${renderMoodSvg('happy', 52)}</div>
+          <h3 class="text-base font-bold">เคลียร์ครบทุกรายการแล้ว!</h3>
+          <p class="text-xs text-[#7a76a3] mt-1">รายการที่กดอนุมัติถูกย้ายไปเก็บที่แท็บ <b>ประวัติการอนุมัติ</b> เรียบร้อยแล้ว</p>
+        </div>
+      ` : `
+        <div class="space-y-3">
+          ${list.map(r => {
+            const empAcc = registeredAccounts[(r.empId || '').toUpperCase()] || {};
+            return `
+              <div class="comic-card p-3.5">
+                <div class="flex items-start justify-between gap-2">
+                  <div class="flex items-center gap-2.5">
+                    ${renderMoodSvg(r.mood || empAcc.mood || 'happy', 40, empAcc.avatarPhoto)}
+                    <div>
+                      <div class="text-sm font-bold flex items-center gap-1.5">
+                        <span>${r.firstName} ${r.lastName || ''}</span>
+                        <span class="text-[10px] px-2 py-0.2 rounded-full border border-[#1e1b4b] bg-[#f6f5ff]">${r.empId}</span>
+                      </div>
+                      <div class="text-xs font-bold text-[#4f46e5] mt-0.5">
+                        ${r.type === 'ot' ? `⚡ ขอทำโอที +${fmtH(otHoursOf(r))} ชม. (${formatThaiShort(r.from)})` : `🌴 ขอลาพักร้อน (${formatThaiShort(r.from)} – ${formatThaiShort(r.to)})`}
+                      </div>
+                      <div class="text-[11px] text-[#7a76a3] mt-0.5">
+                        ${r.type === 'ot' ? `เวลา ${r.timeIn} – ${r.timeOut} น. · ` : ''}${r.note || ''}
+                      </div>
+                    </div>
+                  </div>
+                  <button type="button" onclick="deleteTeamRequest('${r.id}')" class="w-8 h-8 rounded-full bg-[#ffd6e0] border border-[#1e1b4b] flex items-center justify-center text-xs shrink-0" title="ลบรายการนี้">🗑️</button>
+                </div>
+
+                ${r.photo ? `
+                  <div class="mt-2.5 p-2 rounded-2xl border border-[#1e1b4b] bg-[#f6f5ff] flex items-center justify-between gap-2">
+                    <div class="min-w-0 text-[11px]">
+                      <div class="font-bold">📸 หลักฐานเช็คเอาท์: ${r.checkoutTime || '-'} น.</div>
+                      <div class="text-[#7a76a3] truncate">📍 ${r.checkoutLocation || 'ยืนยัน GPS แล้ว'}</div>
+                    </div>
+                    <button type="button" onclick="openApprovalDetail('${r.id}')" class="comic-pill px-3 py-1 text-[11px] bg-white shrink-0">ดูรูปหลักฐาน</button>
+                  </div>
+                ` : ''}
+
+                ${r.status === 'submitted' ? `
+                  <div class="grid grid-cols-2 gap-2 mt-3">
+                    <button type="button" onclick="decideRequest('${r.id}', 'rejected')" class="comic-btn py-2 bg-[#ffd6e0] text-xs">✕ ไม่อนุมัติ</button>
+                    <button type="button" onclick="decideRequest('${r.id}', 'approved')" class="comic-btn py-2 bg-[#c6f3dc] text-xs">✓ อนุมัติคำขอ</button>
+                  </div>
+                ` : `
+                  <div class="mt-2.5 pt-2 border-t border-dashed border-[#c7c3ea] flex items-center justify-between text-xs font-bold">
+                    <span>ผลการพิจารณา:</span>
+                    <span class="px-2.5 py-0.5 rounded-full border border-[#1e1b4b] ${r.status === 'approved' ? 'bg-[#c6f3dc]' : 'bg-[#ffd6e0]'}">
+                      ${r.status === 'approved' ? '✓ อนุมัติแล้ว' : '✕ ไม่อนุมัติ'}
+                    </span>
+                  </div>
+                `}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `}
+    `;
+  }
+
+  function openApprovalDetail(reqId) {
+    const r = state.teamRequests.find(x => x.id === reqId);
+    if (!r) return;
+    const sheet = document.getElementById('approvalSheetContent');
+    sheet.innerHTML = `
+      <div class="w-10 h-1.5 rounded-full bg-[#c7c3ea] mx-auto mb-3"></div>
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h3 class="text-base font-bold">รายละเอียดคำขอ — ${r.firstName} ${r.lastName || ''}</h3>
+          <p class="text-xs text-[#7a76a3]">รหัสพนักงาน: ${r.empId}</p>
+        </div>
+        <button type="button" onclick="closeApprovalDetail()" class="w-8 h-8 rounded-full border-2 border-[#1e1b4b] bg-white font-bold">✕</button>
+      </div>
+
+      <div class="comic-card p-3.5 bg-white space-y-1.5 text-xs mb-3">
+        <div><b>ประเภท:</b> ${r.type === 'ot' ? `ขอทำโอที (+${fmtH(otHoursOf(r))} ชม.)` : 'ขอลาพักร้อน'}</div>
+        <div><b>วันที่:</b> ${r.type === 'ot' ? formatThaiFull(r.from) : `${formatThaiShort(r.from)} – ${formatThaiShort(r.to)}`}</div>
+        ${r.type === 'ot' ? `<div><b>เวลา:</b> ${r.timeIn} – ${r.timeOut} น.</div>` : ''}
+        <div><b>รายละเอียด:</b> ${r.note || '-'}</div>
+        ${r.photo ? `
+          <div class="pt-2">
+            <img src="${r.photo}" onclick="openPhotoViewer('${r.id}')" class="w-full max-h-64 object-cover rounded-2xl border-2 border-[#1e1b4b] cursor-pointer" alt="หลักฐาน" />
+            <div class="text-[11px] text-[#7a76a3] mt-1.5">🕒 ${r.checkoutTime || '-'} น. · 📍 ${r.checkoutLocation || 'GPS Verified'}</div>
+          </div>
+        ` : ''}
+      </div>
+
+      ${r.status === 'submitted' ? `
+        <div class="grid grid-cols-2 gap-2.5">
+          <button type="button" onclick="decideRequest('${r.id}', 'rejected'); closeApprovalDetail();" class="comic-btn py-3 bg-[#ffd6e0] text-sm">✕ ไม่อนุมัติ</button>
+          <button type="button" onclick="decideRequest('${r.id}', 'approved'); closeApprovalDetail();" class="comic-btn py-3 bg-[#c6f3dc] text-sm">✓ อนุมัติคำขอ</button>
+        </div>
+      ` : ''}
+    `;
+    document.getElementById('approvalSheet').classList.add('open');
+  }
+
+  function closeApprovalDetail() {
+    document.getElementById('approvalSheet').classList.remove('open');
+  }
+
+  function openPhotoViewer(reqId) {
+    const r = state.teamRequests.find(x => x.id === reqId);
+    if (!r || !r.photo) return;
+    document.getElementById('photoViewerImg').src = r.photo;
+    document.getElementById('photoViewerMeta').textContent = `${r.firstName} (${r.empId}) · เช็คเอาท์ ${r.checkoutTime || '-'} น. · ${r.checkoutLocation || ''}`;
+    document.getElementById('photoViewer').classList.add('open');
+  }
+
+  function closePhotoViewer() {
+    document.getElementById('photoViewer').classList.remove('open');
+  }
+
+  async function decideRequest(reqId, decision) {
+    const idx = state.teamRequests.findIndex(r => r.id === reqId);
+    if (idx === -1) return;
+    state.teamRequests[idx].status = decision;
+    state.teamRequests[idx].updatedAt = Date.now();
+    const updatedReq = state.teamRequests[idx];
+
+    window.persistLocalDatabase();
+    rebuildVisibleCalendarItems();
+    renderApp();
+    showToast(decision === 'approved' ? '✓ อนุมัติคำขอเรียบร้อยแล้ว' : '✕ บันทึกไม่อนุมัติคำขอแล้ว');
+
+    if (window.cloudStore) {
+      await window.cloudStore.saveRequest(updatedReq);
+    }
+  }
+
+  async function deleteTeamRequest(reqId) {
+    const target = state.teamRequests.find(r => r.id === reqId);
+    if (!target) return;
+    deletedRequestIds.add(reqId);
+    state.teamRequests = state.teamRequests.filter(r => r.id !== reqId);
+
+    const empUp = (target.empId || '').trim().toUpperCase();
+    const calKey = `${empUp}_${target.from}`;
+    deletedCalendarKeys.add(calKey);
+    allCloudCalendarItems = allCloudCalendarItems.filter(c => !((c.empId || '').toUpperCase() === empUp && c.dateKey === target.from));
+
+    window.persistLocalDatabase();
+    rebuildVisibleCalendarItems();
+    renderApp();
+    showToast('🗑️ ลบรายการคำขอและข้อมูลบนปฏิทินเรียบร้อย');
+
+    if (window.cloudStore) {
+      await window.cloudStore.deleteRequest(reqId);
+      await window.cloudStore.deleteCalendarItem(empUp, target.from);
+    }
+  }
+
+  // =========================================================================
+  // Profile, Avatar Photo Editor, Employee Account Deletion & Cloud Config
+  // =========================================================================
+  function renderProfileTab() {
+    const manager = isManager();
+    const empList = Object.values(registeredAccounts).filter(a => (a.empId || '').toUpperCase() !== APPROVER_ID);
+
+    return `
+      <div class="comic-card p-4 text-center mb-3">
+        <div class="relative inline-block">
+          ${renderMoodSvg(state.user.mood, 76, state.user.avatarPhoto)}
+          <label class="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-[#ffb98a] border-2 border-[#1e1b4b] flex items-center justify-center text-xs cursor-pointer shadow">
+            ✏️
+            <input type="file" accept="image/*" onchange="handleProfileAvatarUpload(event)" class="hidden" />
+          </label>
+        </div>
+
+        <h2 class="text-base font-bold mt-2">${state.user.firstName} ${state.user.lastName || ''}</h2>
+        <p class="text-xs text-[#7a76a3]">รหัส: <b>${state.user.empId}</b> ${manager ? '(ผู้อนุมัติหลัก)' : ''}</p>
+
+        <div class="grid grid-cols-2 gap-2 mt-3">
+          <label class="comic-pill py-2 text-xs bg-[#d9f0ff] cursor-pointer flex items-center justify-center gap-1">
+            <span>📷 ถ่ายรูปโปรไฟล์</span>
+            <input type="file" accept="image/*" capture="user" onchange="handleProfileAvatarUpload(event)" class="hidden" />
+          </label>
+          <label class="comic-pill py-2 text-xs bg-[#e5e2ff] cursor-pointer flex items-center justify-center gap-1">
+            <span>🖼️ เลือกจากอัลบั้ม</span>
+            <input type="file" accept="image/*" onchange="handleProfileAvatarUpload(event)" class="hidden" />
+          </label>
+        </div>
+
+        ${state.user.avatarPhoto ? `
+          <button type="button" onclick="removeProfileAvatar()" class="mt-2 text-[11px] font-bold text-[#e11d48] underline">ลบรูปโปรไฟล์ (กลับไปใช้ไอคอนอารมณ์)</button>
+        ` : ''}
+      </div>
+
+      <div class="comic-card p-3.5 mb-3">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-sm font-bold">☁️ การซิงค์ฐานข้อมูลกลางข้ามเครื่อง</h3>
+          <button type="button" onclick="window.cloudStore && window.cloudStore.pullFromCloud(true)" class="comic-pill px-3 py-1 text-[11px] bg-[#c6f3dc]">🔄 ซิงค์ขึ้น-ลงเดี๋ยวนี้</button>
+        </div>
+        <p class="text-[11px] text-[#7a76a3]">ซิงค์แบบเรียลไทม์ผ่านฐานข้อมูลกลาง (Firestore) · คำขอและรายชื่อพนักงานส่งถึง SM ทันที ถ้าเน็ตหลุดจะเก็บคิวไว้แล้วส่งให้อัตโนมัติ</p>
+        ${manager ? `
+          <div class="mt-2.5 pt-2.5 border-t border-dashed border-[#c7c3ea]">
+            <label class="block text-[11px] font-bold mb-1">🔥 Firebase config (วางทั้งก้อน — ใช้ทดสอบเครื่องนี้ ปกติฝังไว้ในไฟล์)</label>
+            <div class="flex gap-1.5">
+              <input id="inpCustomCloudUrl" type="text" value="" class="comic-input !py-1.5 !text-xs" placeholder='วาง {"apiKey":"…","projectId":"…"}' />
+              <button type="button" onclick="saveCustomCloudUrlSetting()" class="comic-pill px-3 py-1.5 text-[11px] bg-[#ffe6d3] shrink-0">บันทึก</button>
+            </div>
+          </div>
+        ` : ''}
+      </div>
+
+      ${manager ? `
+        <div class="comic-card p-3.5 mb-3">
+          <div class="flex items-center justify-between mb-2.5">
+            <h3 class="text-sm font-bold">👥 จัดการบัญชีพนักงานในระบบ (${empList.length} คน)</h3>
+          </div>
+          ${empList.length === 0 ? `
+            <p class="text-xs text-[#7a76a3] text-center py-3">ยังไม่มีบัญชีพนักงานที่ลงทะเบียน</p>
+          ` : `
+            <div class="space-y-2">
+              ${empList.map(emp => {
+                const id = emp.empId.toUpperCase();
+                const isConfirming = state.confirmDeleteEmpId === id;
+                return `
+                  <div class="p-2.5 rounded-2xl border-2 border-[#1e1b4b] bg-[#f6f5ff] flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 min-w-0">
+                      ${renderMoodSvg(emp.mood || 'happy', 34, emp.avatarPhoto)}
+                      <div class="min-w-0">
+                        <div class="text-xs font-bold truncate">${emp.firstName} ${emp.lastName || ''}</div>
+                        <div class="text-[10px] text-[#7a76a3]">รหัส: <b>${id}</b></div>
+                      </div>
+                    </div>
+                    ${isConfirming ? `
+                      <div class="flex items-center gap-1 shrink-0">
+                        <button type="button" onclick="deleteEmployeeAccount('${id}')" class="px-2.5 py-1 rounded-full bg-[#ff4d8d] text-white border border-[#1e1b4b] text-[10px] font-bold">ยืนยันลบ</button>
+                        <button type="button" onclick="state.confirmDeleteEmpId=null; renderApp();" class="px-2 py-1 rounded-full bg-white border border-[#1e1b4b] text-[10px] font-bold">ยกเลิก</button>
+                      </div>
+                    ` : `
+                      <button type="button" onclick="state.confirmDeleteEmpId='${id}'; renderApp();" class="comic-pill px-3 py-1 text-[11px] bg-[#ffd6e0] shrink-0">🗑️ ลบบัญชี</button>
+                    `}
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `}
+        </div>
+      ` : ''}
+
+      <button type="button" onclick="logoutUser()" class="comic-btn w-full py-3 bg-[#ffd6e0] text-sm">
+        ออกจากระบบ / สลับรหัสพนักงาน
+      </button>
+    `;
+  }
+
+  async function saveCustomCloudUrlSetting() {
+    const val = (document.getElementById('inpCustomCloudUrl')?.value || '').trim();
+    if (window.cloudStore && window.cloudStore.setCustomCloudUrl) {
+      await window.cloudStore.setCustomCloudUrl(val);
+      if (val) showToast('☁️ บันทึก Firebase config แล้ว');
+    }
+  }
+
+  function handleProfileAvatarUpload(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file || !state.user) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        const size = 220;
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const minSide = Math.min(img.width, img.height);
+        const sx = (img.width - minSide) / 2;
+        const sy = (img.height - minSide) / 2;
+        ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, size, size);
+        const avatarData = canvas.toDataURL('image/jpeg', 0.72);
+
+        state.user.avatarPhoto = avatarData;
+        const id = state.user.empId.toUpperCase();
+        registeredAccounts[id] = {
+          ...(registeredAccounts[id] || state.user),
+          empId: id,
+          avatarPhoto: avatarData,
+          updatedAt: Date.now()
+        };
+        window.persistLocalDatabase();
+        renderApp();
+        showToast('✨ อัปเดตรูปโปรไฟล์เรียบร้อยแล้ว');
+        if (window.cloudStore) await window.cloudStore.saveAccount(registeredAccounts[id]);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function removeProfileAvatar() {
+    if (!state.user) return;
+    state.user.avatarPhoto = '';
+    const id = state.user.empId.toUpperCase();
+    if (registeredAccounts[id]) {
+      registeredAccounts[id].avatarPhoto = '';
+      registeredAccounts[id].updatedAt = Date.now();
+    }
+    window.persistLocalDatabase();
+    renderApp();
+    showToast('ลบรูปโปรไฟล์แล้ว');
+    if (window.cloudStore && registeredAccounts[id]) {
+      await window.cloudStore.saveAccount(registeredAccounts[id]);
+    }
+  }
+
+  async function deleteEmployeeAccount(empId) {
+    const targetId = (empId || '').trim().toUpperCase();
+    if (!targetId || targetId === APPROVER_ID) return;
+
+    deletedAccountIds.add(targetId);
+    delete registeredAccounts[targetId];
+
+    state.teamRequests.forEach(r => {
+      if ((r.empId || '').trim().toUpperCase() === targetId) {
+        deletedRequestIds.add(r.id);
+      }
+    });
+    state.teamRequests = state.teamRequests.filter(r => (r.empId || '').trim().toUpperCase() !== targetId);
+
+    allCloudCalendarItems.forEach(c => {
+      if ((c.empId || '').trim().toUpperCase() === targetId) {
+        deletedCalendarKeys.add(`${targetId}_${c.dateKey}`);
+      }
+    });
+    allCloudCalendarItems = allCloudCalendarItems.filter(c => (c.empId || '').trim().toUpperCase() !== targetId);
+
+    state.confirmDeleteEmpId = null;
+    window.persistLocalDatabase();
+    rebuildVisibleCalendarItems();
+    renderApp();
+    showToast(`🗑️ ลบบัญชี ${targetId} และลบรายการ OT/ลาพักร้อนทั้งหมดแล้ว`);
+
+    if (window.cloudStore) {
+      await window.cloudStore.deleteAccount(targetId);
+    }
+  }
+
+  // =========================================================================
+  // Toast, PWA Install & Main Render Loop
+  // =========================================================================
+  let toastTimer = null;
+  function showToast(msg) {
+    const pill = document.getElementById('toastPill');
+    if (!pill) return;
+    pill.textContent = msg;
+    pill.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => pill.classList.remove('show'), 2800);
+  }
+  window.showToast = showToast;
+
+  let deferredInstallPrompt = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+  });
+
+  function triggerAppInstall() {
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      deferredInstallPrompt = null;
+      return;
+    }
+    showToast('เปิดใน Safari / Chrome แล้วกด "แชร์ → เพิ่มไปยังหน้าจอโฮม" เพื่อติดตั้งแอป');
+  }
+
+  function renderApp() {
+    const activeEl = document.activeElement;
+    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+      return;
+    }
+    if (!state.user) return;
+    renderHeader();
+    renderNav();
+    const main = document.getElementById('appMain');
+    if (state.activeTab === 'cal') main.innerHTML = renderCalendarTab();
+    else if (state.activeTab === 'sum') main.innerHTML = renderSummaryTab();
+    else if (state.activeTab === 'app' && isManager()) main.innerHTML = renderApprovalTab();
+    else main.innerHTML = renderProfileTab();
+  }
+
+  setInterval(() => {
+    const clockEl = document.getElementById('liveThaiClock');
+    if (clockEl) clockEl.textContent = getThaiTimeStr();
+  }, 1000);
+
+  if (state.user && state.user.empId) {
+    document.getElementById('loginScreen').classList.add('hidden');
+    rebuildVisibleCalendarItems();
+    renderApp();
+  }
+</script>
+</body>
+</html>
